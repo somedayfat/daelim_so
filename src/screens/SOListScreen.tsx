@@ -1,27 +1,21 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { Text, Searchbar, SegmentedButtons, Card, Badge, FAB, ActivityIndicator } from 'react-native-paper';
+import { View, StyleSheet, FlatList, Alert } from 'react-native';
+import { Searchbar, List, FAB, Chip, Text, Checkbox, Button, Card } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
+import { accountingService } from '../api/accountingService';
 import { hasilSoService } from '../api/hasilSoService';
-import { HasilSO } from '../constants/types';
+import { RefAccounting, HasilSO } from '../constants/types';
 
 const SOListScreen = ({ navigation }: any) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState('Semua');
-  const [items, setItems] = useState<HasilSO[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [items, setItems] = useState<RefAccounting[]>([]);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
 
   const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await hasilSoService.getAllHasil(searchQuery, filter);
-      setItems(data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  }, [searchQuery, filter]);
+    const data = await accountingService.getUnverified();
+    setItems(data);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -29,143 +23,111 @@ const SOListScreen = ({ navigation }: any) => {
     }, [loadData])
   );
 
-  const getMatchColor = (status: string) => {
-    switch (status) {
-      case 'MATCH': return '#4CAF50';
-      case 'BEDA_NAMA': return '#FFC107';
-      case 'BARU': return '#2196F3';
-      case 'TIDAK_ADA_FISIK': return '#F44336';
-      default: return '#757575';
+  const filteredItems = items.filter(item => 
+    item.nama_accounting.toLowerCase().includes(search.toLowerCase()) ||
+    item.no_invoice?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleSelect = (id: number) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(prev => prev.filter(i => i !== id));
+    } else {
+      setSelectedIds(prev => [...prev, id]);
     }
   };
 
-  const renderItem = ({ item }: { item: HasilSO }) => (
-    <Card 
-      style={styles.card} 
-      onPress={() => navigation.navigate('SOForm', { item })}
-    >
-      <Card.Content>
-        <View style={styles.row}>
-          <View style={{ flex: 1 }}>
-            <Text variant="labelLarge" style={styles.assetNo}>{item.no_asset}</Text>
-            <Text variant="titleMedium">{item.nama_lapangan}</Text>
-            <Text variant="bodySmall">{item.departemen || 'Tanpa Departemen'}</Text>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Badge 
-              style={[styles.badge, { backgroundColor: getMatchColor(item.status_match) }]}
-            >
-              {item.status_match}
-            </Badge>
-            <Badge 
-              style={[styles.soBadge, { backgroundColor: item.status_so === 'FINAL' ? '#2E7D32' : '#757575' }]}
-            >
-              {item.status_so}
-            </Badge>
-          </View>
-        </View>
-      </Card.Content>
-    </Card>
-  );
+  const handleBatchSO = () => {
+    const selectedItems = items.filter(item => selectedIds.includes(item.id!));
+    if (selectedItems.length === 0) return;
+
+    Alert.alert(
+      'Batch Stock Opname',
+      `Anda memilih ${selectedItems.length} mesin. Gunakan data & foto yang sama untuk semua mesin ini?`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        { 
+          text: 'Ya, Lanjutkan', 
+          onPress: () => {
+            navigation.navigate('SOForm', { 
+              batchItems: selectedItems,
+              isBatch: true 
+            });
+          } 
+        }
+      ]
+    );
+  };
 
   return (
     <View style={styles.container}>
       <Searchbar
-        placeholder="Cari Asset..."
-        onChangeText={setSearchQuery}
-        value={searchQuery}
+        placeholder="Cari Invoice atau Nama Mesin..."
+        onChangeText={setSearch}
+        value={search}
         style={styles.search}
       />
-      
-      <SegmentedButtons
-        value={filter}
-        onValueChange={setFilter}
-        buttons={[
-          { value: 'Semua', label: 'Semua' },
-          { value: 'Draft', label: 'Draft' },
-          { value: 'Final', label: 'Final' },
-        ]}
-        style={styles.filter}
+
+      <View style={styles.header}>
+        <Text variant="bodySmall">{filteredItems.length} Aset belum SO</Text>
+        <Button 
+          mode="text" 
+          onPress={() => {
+            setIsSelectionMode(!isSelectionMode);
+            setSelectedIds([]);
+          }}
+        >
+          {isSelectionMode ? 'Batal Pilih' : 'Pilih Banyak'}
+        </Button>
+      </View>
+
+      <FlatList
+        data={filteredItems}
+        keyExtractor={(item) => item.id?.toString() || ''}
+        renderItem={({ item }) => (
+          <List.Item
+            title={item.nama_accounting}
+            description={`Inv: ${item.no_invoice || '-'} | Dept: ${item.departemen || '-'}`}
+            onPress={() => isSelectionMode ? toggleSelect(item.id!) : navigation.navigate('SOForm', { accItem: item })}
+            left={props => isSelectionMode ? (
+              <Checkbox 
+                status={selectedIds.includes(item.id!) ? 'checked' : 'unchecked'} 
+                onPress={() => toggleSelect(item.id!)}
+              />
+            ) : <List.Icon {...props} icon="cube-outline" />}
+            style={styles.listItem}
+          />
+        )}
       />
 
-      {loading ? (
-        <ActivityIndicator style={{ flex: 1 }} />
-      ) : (
-        <FlatList
-          data={items}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.no_asset}
-          contentContainerStyle={styles.list}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text>Belum ada data SO.</Text>
-            </View>
-          }
+      {isSelectionMode && selectedIds.length > 0 && (
+        <FAB
+          icon="check-all"
+          label={`Proses ${selectedIds.length} Mesin`}
+          style={styles.fab}
+          onPress={handleBatchSO}
+          color="white"
         />
       )}
 
-      <FAB
-        icon="plus"
-        style={styles.fab}
-        onPress={() => navigation.navigate('SOForm')}
-        label="SO BARU"
-        color="white"
-      />
+      {!isSelectionMode && (
+        <FAB
+          icon="plus"
+          label="Aset Baru"
+          style={styles.fab}
+          onPress={() => navigation.navigate('SOForm')}
+          color="white"
+        />
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  search: {
-    margin: 10,
-    elevation: 2,
-    backgroundColor: '#fff',
-  },
-  filter: {
-    marginHorizontal: 10,
-    marginBottom: 10,
-  },
-  list: {
-    padding: 10,
-    paddingBottom: 80,
-  },
-  card: {
-    marginBottom: 10,
-    backgroundColor: '#fff',
-    elevation: 1,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  assetNo: {
-    color: '#1565C0',
-    fontWeight: 'bold',
-  },
-  badge: {
-    marginBottom: 5,
-    borderRadius: 4,
-    paddingHorizontal: 8,
-  },
-  soBadge: {
-    borderRadius: 4,
-  },
-  fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#1565C0',
-  },
-  empty: {
-    alignItems: 'center',
-    marginTop: 50,
-  }
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  search: { margin: 10, elevation: 2 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15 },
+  listItem: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
+  fab: { position: 'absolute', margin: 16, right: 0, bottom: 0, backgroundColor: '#1565C0' },
 });
 
 export default SOListScreen;

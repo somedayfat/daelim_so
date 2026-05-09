@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "temp_app",
+    "name": "Asset SO Daelim",
     "slug": "temp_app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#1565C0"
     },
     "ios": {
       "supportsTablet": true
@@ -20,14 +20,19 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "package": "com.kalzstudio.daelimso",
+      "versionCode": 1
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
+    "updates": {
+      "url": "https://u.expo.dev/70460abc-97a7-4c3c-adf0-51a0ef68673e"
     },
-    "plugins": [
-      "expo-sqlite"
-    ]
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "70460abc-97a7-4c3c-adf0-51a0ef68673e"
+      }
+    }
   }
 }

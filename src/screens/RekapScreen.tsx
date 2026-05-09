@@ -5,7 +5,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { hasilSoService } from '../api/hasilSoService';
 import { accountingService } from '../api/accountingService';
 import { exportToExcel } from '../api/excelService';
-import * as FileSystem from 'expo-file-system';
+// @ts-ignore
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { SODashboardStats } from '../constants/types';
 
@@ -14,8 +15,12 @@ const RekapScreen = () => {
   const [loading, setLoading] = useState(false);
 
   const loadData = useCallback(async () => {
-    const data = await hasilSoService.getSummaryStats();
-    setStats(data);
+    try {
+      const data = await hasilSoService.getSummaryStats();
+      setStats(data);
+    } catch (e) {
+      console.error('Load stats error:', e);
+    }
   }, []);
 
   useFocusEffect(
@@ -33,22 +38,24 @@ const RekapScreen = () => {
       const summaryData = {
         'Sesi SO': 'SO-2024-001',
         'Tanggal Export': new Date().toLocaleString(),
-        'Total Accounting': stats?.totalAccounting,
-        'Sudah di-SO': stats?.sudahSO,
-        'Belum di-SO': stats?.belumSO,
-        'Asset Baru': stats?.assetBaru,
-        'Progress (%)': stats?.progress
+        'Total Accounting': stats?.totalAccounting || 0,
+        'Sudah di-SO': stats?.sudahSO || 0,
+        'Belum di-SO': stats?.belumSO || 0,
+        'Asset Baru': stats?.assetBaru || 0,
+        'Progress (%)': stats?.progress || 0
       };
 
       await exportToExcel(hasilSo, belumSo, summaryData);
+    } catch (error: any) {
+      console.error('Export handling error:', error);
+      Alert.alert('Error', 'Gagal mengekspor data: ' + error.message);
+    } finally {
       setLoading(false);
-    } catch (error) {
-      setLoading(false);
-      Alert.alert('Error', 'Gagal mengekspor data');
     }
   };
 
   const handleBackup = async () => {
+    setLoading(true);
     try {
       const dbPath = ((FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '') + 'SQLite/asset_so.db';
       if (await Sharing.isAvailableAsync()) {
@@ -56,20 +63,24 @@ const RekapScreen = () => {
           dialogTitle: 'Backup Database',
           mimeType: 'application/x-sqlite3',
         });
+      } else {
+        Alert.alert('Error', 'Fitur sharing tidak tersedia di perangkat ini');
       }
-    } catch (error) {
-      Alert.alert('Error', 'Gagal mem-backup database.');
+    } catch (error: any) {
+      Alert.alert('Error', 'Gagal mem-backup database: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!stats) return <ActivityIndicator style={{ flex: 1 }} />;
+  if (!stats) return <ActivityIndicator style={{ flex: 1 }} color="#1565C0" />;
 
   return (
     <ScrollView style={styles.container}>
       <Card style={styles.card}>
         <Card.Content>
           <Title style={styles.title}>📊 RINGKASAN STOCK OPNAME</Title>
-          <Text variant="bodySmall">Sesi: SO-2024-001</Text>
+          <Text variant="bodySmall" style={{ textAlign: 'center' }}>Sesi: SO-2024-001</Text>
           <Divider style={styles.divider} />
           
           <List.Item
@@ -116,7 +127,8 @@ const RekapScreen = () => {
         mode="outlined" 
         icon="database-export" 
         onPress={handleBackup}
-        style={[styles.exportBtn, { backgroundColor: '#1565C0', marginTop: 10 }]}
+        disabled={loading}
+        style={[styles.exportBtn, { backgroundColor: '#1565C0', marginTop: 10, borderColor: '#1565C0' }]}
         textColor="white"
       >
         BACKUP DATABASE (.DB)
