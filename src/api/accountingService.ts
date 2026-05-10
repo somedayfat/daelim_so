@@ -8,19 +8,42 @@ export const accountingService = {
 
     await db.execAsync('DELETE FROM ref_accounting');
 
-    let skipped = 0;
-    let imported = 0;
-    for (const item of data) {
-      if (!item.nama_accounting) {
-        skipped++;
-        continue;
-      }
+    // V2: Auto-Grouping Logic
+    // Jika ada Nama + Spek yang sama, gabungkan dan jumlahkan QTY-nya
+    const groupedData: Record<string, RefAccounting> = {};
 
+    for (const item of data) {
+      if (!item.nama_accounting) continue;
+      
+      const cleanName = item.nama_accounting.trim().toLowerCase();
+      const cleanSpec = (item.spesifikasi || '').trim().toLowerCase();
+      const key = `${cleanName}_${cleanSpec}`;
+      
+      if (groupedData[key]) {
+        // Jika sudah ada, tambahkan QTY-nya
+        const currentQty = groupedData[key].qty_accounting || 0;
+        const newQty = item.qty_accounting || 1;
+        groupedData[key].qty_accounting = currentQty + newQty;
+      } else {
+        // Jika belum ada, buat entry baru
+        groupedData[key] = { 
+          ...item, 
+          nama_accounting: item.nama_accounting.trim(),
+          spesifikasi: (item.spesifikasi || '').trim(),
+          qty_accounting: item.qty_accounting || 1 
+        };
+      }
+    }
+
+    const finalItems = Object.values(groupedData);
+    let imported = 0;
+
+    for (const item of finalItems) {
       await db.runAsync(
         `INSERT INTO ref_accounting (
           no_invoice, nama_accounting, spesifikasi, pembuat,
-          daya_kw, tahun_buat, tahun_beli, departemen, catatan_acc
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          daya_kw, tahun_buat, tahun_beli, departemen, catatan_acc, qty_accounting
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           String(item.no_invoice  || ''),
           String(item.nama_accounting  || ''),
@@ -30,13 +53,14 @@ export const accountingService = {
           String(item.tahun_buat  || ''),
           String(item.tahun_beli  || ''),
           String(item.departemen  || ''),
-          String(item.catatan_acc || '')
+          String(item.catatan_acc || ''),
+          Number(item.qty_accounting || 1)
         ]
       );
       imported++;
     }
 
-    return { imported, skipped, total: data.length };
+    return { imported, skipped: data.length - imported, total: data.length };
   },
 
   hasData: async (): Promise<boolean> => {
@@ -53,7 +77,6 @@ export const accountingService = {
       const rows = await db.getAllAsync<RefAccounting>(
         'SELECT * FROM ref_accounting ORDER BY nama_accounting ASC'
       );
-      // Pastikan tidak ada null di nama_accounting supaya filter aman
       return rows.filter(r => r.nama_accounting != null && String(r.nama_accounting).trim() !== '');
     } catch (err: any) {
       console.error('[accountingService.getAll] error:', err?.message || err);

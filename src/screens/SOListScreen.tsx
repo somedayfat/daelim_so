@@ -1,18 +1,19 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList } from 'react-native';
-import { Searchbar, List, FAB, Chip, Text, Badge } from 'react-native-paper';
+import { View, StyleSheet, FlatList, Alert } from 'react-native';
+import { Searchbar, List, FAB, Chip, Text, Badge, IconButton } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import { hasilSoService } from '../api/hasilSoService';
 import { HasilSO } from '../constants/types';
 
 const STATUS_COLORS: Record<string, string> = {
   MATCH: '#4CAF50',
-  BEDA_NAMA: '#FF9800',
-  BARU: '#1565C0',
-  TIDAK_ADA_FISIK: '#F44336',
+  KURANG: '#FF9800',
+  LEBIH: '#1565C0',
+  TIDAK_ADA: '#F44336',
+  BARU: '#673AB7',
 };
 
-const FILTERS = ['Semua', 'Draft', 'Final', 'Belum di-SO'];
+const FILTERS = ['Semua', 'Draft', 'Final'];
 
 const SOListScreen = ({ navigation }: any) => {
   const [search, setSearch] = useState('');
@@ -32,10 +33,41 @@ const SOListScreen = ({ navigation }: any) => {
 
   const getStatusColor = (status: string) => STATUS_COLORS[status] || '#757575';
 
+  const handleConfirmDelete = (item: HasilSO) => {
+    Alert.alert(
+      'Hapus Data',
+      `Yakin ingin menghapus hasil SO untuk "${item.nama_lapangan || item.nama_accounting}"?`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        { 
+          text: 'Hapus', 
+          style: 'destructive',
+          onPress: async () => {
+            if (item.id) {
+              await hasilSoService.deleteHasil(item.id);
+              loadData();
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const getMatchCode = (status: string) => {
+    switch(status) {
+      case 'MATCH': return 'MC';
+      case 'KURANG': return 'KR';
+      case 'LEBIH': return 'LB';
+      case 'TIDAK_ADA': return 'TA';
+      case 'BARU': return 'BR';
+      default: return '??';
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Searchbar
-        placeholder="Cari Nama Mesin atau No Asset..."
+        placeholder="Cari Nama Item..."
         onChangeText={setSearch}
         value={search}
         style={styles.search}
@@ -62,16 +94,16 @@ const SOListScreen = ({ navigation }: any) => {
       </View>
 
       <Text variant="bodySmall" style={styles.count}>
-        {items.length} aset ditemukan
+        {items.length} tipe item ditemukan
       </Text>
 
       <FlatList
         data={items}
-        keyExtractor={(item) => item.no_asset || item.id?.toString() || ''}
+        keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
         renderItem={({ item }) => (
           <List.Item
             title={item.nama_lapangan || item.nama_accounting}
-            description={`${item.no_asset} | ${item.departemen || '-'}`}
+            description={`Ditemukan: ${item.qty_aktual} Unit | Dept: ${item.departemen || '-'}`}
             onPress={() => navigation.navigate('SOForm', { item })}
             left={props => (
               <View style={styles.badgeContainer}>
@@ -87,15 +119,19 @@ const SOListScreen = ({ navigation }: any) => {
                   size={24}
                   style={[styles.matchBadge, { backgroundColor: getStatusColor(item.status_match) }]}
                 >
-                  {item.status_match === 'BEDA_NAMA' ? 'BD' :
-                   item.status_match === 'TIDAK_ADA_FISIK' ? 'TF' :
-                   item.status_match === 'BARU' ? 'BR' : 'MC'}
+                  {getMatchCode(item.status_match)}
                 </Badge>
                 <Badge
                   style={[styles.soBadge, { backgroundColor: item.status_so === 'FINAL' ? '#4CAF50' : '#FF9800' }]}
                 >
                   {item.status_so}
                 </Badge>
+                <IconButton 
+                  icon="delete" 
+                  size={20} 
+                  iconColor="#F44336" 
+                  onPress={() => handleConfirmDelete(item)} 
+                />
               </View>
             )}
             style={styles.listItem}
@@ -105,7 +141,7 @@ const SOListScreen = ({ navigation }: any) => {
 
       <FAB
         icon="plus"
-        label="Aset Baru"
+        label="Item Baru"
         style={styles.fab}
         onPress={() => navigation.navigate('SOForm')}
         color="white"

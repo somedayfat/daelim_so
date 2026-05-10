@@ -11,7 +11,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  soSession: 'SO-2024-001',
+  soSession: `SO-${new Date().toISOString().split('T')[0]}`,
   companyName: 'PT. DAELIM',
   stats: {
     totalAccounting: 0,
@@ -19,6 +19,9 @@ export const useAppStore = create<AppState>((set) => ({
     belumSO: 0,
     assetBaru: 0,
     progress: 0,
+    totalQtyAccounting: 0,
+    totalQtyAktual: 0,
+    selisihTotal: 0,
   },
   
   setSoSession: (soSession) => set({ soSession }),

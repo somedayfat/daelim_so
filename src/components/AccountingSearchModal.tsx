@@ -95,6 +95,7 @@ const AccountingSearchModal = ({ visible, onDismiss, onSelect }: Props) => {
                 description={[
                   item.spesifikasi,
                   item.daya_kw ? `${item.daya_kw} Kw` : '',
+                  `Qty: ${item.qty_accounting || 1}`,
                   item.departemen,
                   item.no_invoice ? `Inv: ${item.no_invoice}` : '',
                 ]

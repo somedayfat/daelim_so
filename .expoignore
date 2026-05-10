@@ -1,0 +1,12 @@
+# Expo ignore
+node_modules/
+.git/
+.expo/
+*.db
+*.db-journal
+assets/*.xlsx
+database.xlsx
+daelim_logo.png
+.gitignore
+.editorconfig
+README.md

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, Image } from 'react-native';
 import { Text, Card, Button, ProgressBar, Title, IconButton, ActivityIndicator } from 'react-native-paper';
 import { useAppStore } from '../store/useAppStore';
 import { useFocusEffect } from '@react-navigation/native';
@@ -82,8 +82,13 @@ const DashboardScreen = ({ navigation }: any) => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <View>
-          <Title style={styles.title}>Dashboard</Title>
+        <Image 
+          source={require('../../assets/icon.png')} 
+          style={styles.logo} 
+          resizeMode="contain"
+        />
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <Title style={styles.title}>Daelim SO Apps</Title>
           <Text variant="bodyMedium">Sesi: {soSession}</Text>
         </View>
         <IconButton icon="refresh" onPress={loadStats} disabled={refreshing} />
@@ -94,23 +99,41 @@ const DashboardScreen = ({ navigation }: any) => {
           <Text variant="titleMedium">Progress Stock Opname</Text>
           <ProgressBar progress={stats.progress / 100} color="#1565C0" style={styles.progress} />
           <View style={styles.statsRow}>
-            <Text>{stats.sudahSO} / {stats.totalAccounting} Item</Text>
+            <Text>{stats.sudahSO} / {stats.totalAccounting} Tipe Item</Text>
             <Text>{stats.progress}%</Text>
+          </View>
+        </Card.Content>
+      </Card>
+
+      {/* Statistik Kuantitas V2 */}
+      <Card style={styles.cardQty}>
+        <Card.Content>
+          <Text variant="labelMedium" style={styles.qtyLabel}>Ringkasan Kuantitas (Unit)</Text>
+          <View style={styles.qtyGrid}>
+            <View style={styles.qtyItem}>
+              <Text variant="labelSmall">Accounting</Text>
+              <Text variant="titleMedium">{stats.totalQtyAccounting}</Text>
+            </View>
+            <View style={styles.qtyItem}>
+              <Text variant="labelSmall">Aktual</Text>
+              <Text variant="titleMedium" style={{ color: '#1565C0' }}>{stats.totalQtyAktual}</Text>
+            </View>
+            <View style={styles.qtyItem}>
+              <Text variant="labelSmall">Selisih</Text>
+              <Text variant="titleMedium" style={{ color: stats.selisihTotal < 0 ? '#d32f2f' : '#2e7d32' }}>
+                {stats.selisihTotal > 0 ? `+${stats.selisihTotal}` : stats.selisihTotal}
+              </Text>
+            </View>
           </View>
         </Card.Content>
       </Card>
 
       <View style={styles.grid}>
         <Card style={styles.miniCard}>
-          <Card.Content>
+          <Card.Content style={{ alignItems: 'center' }}>
             <Text variant="labelSmall">Belum SO</Text>
             <Title style={{ color: '#d32f2f' }}>{stats.belumSO}</Title>
-          </Card.Content>
-        </Card>
-        <Card style={styles.miniCard}>
-          <Card.Content>
-            <Text variant="labelSmall">Aset Baru</Text>
-            <Title style={{ color: '#1565C0' }}>{stats.assetBaru}</Title>
+            <Text variant="labelSmall">Tipe Item</Text>
           </Card.Content>
         </Card>
       </View>
@@ -171,11 +194,35 @@ const styles = StyleSheet.create({
   title: {
     color: '#1565C0',
     fontWeight: 'bold',
+    lineHeight: 24,
+  },
+  logo: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
   },
   card: {
+    marginBottom: 10,
+    elevation: 2,
+    backgroundColor: '#fff',
+  },
+  cardQty: {
     marginBottom: 15,
     elevation: 2,
     backgroundColor: '#fff',
+    borderLeftWidth: 4,
+    borderLeftColor: '#1565C0',
+  },
+  qtyLabel: {
+    marginBottom: 8,
+    color: '#757575',
+  },
+  qtyGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  qtyItem: {
+    alignItems: 'center',
   },
   miniCard: {
     flex: 1,

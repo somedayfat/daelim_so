@@ -1,25 +1,25 @@
 import { getDb } from './database';
 
-export const generateNextAssetNumber = async (): Promise<string> => {
+/**
+ * Generate nomor SO urut: SO-0001, SO-0002, dst.
+ */
+export const generateNextSoNumber = async (): Promise<string> => {
   const db = await getDb();
-  if (!db) return 'AST-0001';
+  if (!db) return 'SO-0001';
 
   try {
-    const lastRecord = await db.getFirstAsync<{ no_asset: string }>(
-      'SELECT no_asset FROM hasil_so ORDER BY id DESC LIMIT 1'
+    const row = await db.getFirstAsync<{ max_no: string }>(
+      'SELECT no_so as max_no FROM hasil_so ORDER BY id DESC LIMIT 1'
     );
 
-    if (!lastRecord?.no_asset) return 'AST-0001';
+    if (!row || !row.max_no) return 'SO-0001';
 
-    const parts = lastRecord.no_asset.split('-');
-    const lastNum = parseInt(parts[1] || '0', 10);
+    const lastNo = row.max_no; // Misal "SO-0005"
+    const numPart = lastNo.split('-')[1];
+    const nextNum = parseInt(numPart, 10) + 1;
     
-    if (isNaN(lastNum)) return 'AST-0001';
-    
-    const nextNum = (lastNum + 1).toString().padStart(4, '0');
-    return `AST-${nextNum}`;
-  } catch (error) {
-    console.warn('[generateNextAssetNumber] error:', error);
-    return 'AST-0001';
+    return `SO-${String(nextNum).padStart(4, '0')}`;
+  } catch (err) {
+    return 'SO-0001';
   }
 };

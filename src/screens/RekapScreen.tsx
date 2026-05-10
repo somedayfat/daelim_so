@@ -4,6 +4,7 @@ import { Text, Title, Card, Button, Divider, List, ActivityIndicator, ProgressBa
 import { useFocusEffect } from '@react-navigation/native';
 import { hasilSoService, RekapDetailStats } from '../api/hasilSoService';
 import { accountingService } from '../api/accountingService';
+import { getDb } from '../api/database';
 import { exportToExcel } from '../api/excelService';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -41,12 +42,13 @@ const RekapScreen = () => {
 
       const summaryData = {
         'Sesi SO': soSession,
-        'Total Data Accounting': stats.totalAccounting,
-        'Total Hasil SO': stats.sudahSO,
-        'MATCH': stats.matchCount,
-        'BEDA NAMA': stats.bedaNamaCount,
-        'BARU': stats.baruCount,
-        'TIDAK ADA FISIK': stats.tidakAdaFisikCount,
+        'Total Unit (Accounting)': stats.totalAccounting,
+        'Total Tipe Item': stats.totalTipe,
+        'Tipe Sudah di-SO': stats.sudahSO,
+        'MATCH (Qty Pas)': stats.matchCount,
+        'KURANG (Unit Hilang)': stats.bedaNamaCount,
+        'LEBIH (Aset Berlebih)': stats.lebihCount,
+        'TIDAK ADA FISIK (0)': stats.tidakAdaFisikCount,
         'Belum di-SO': stats.belumSO,
         'Final': stats.finalCount,
         'Draft': stats.draftCount,
@@ -55,7 +57,7 @@ const RekapScreen = () => {
 
       const result = await exportToExcel(hasilSo, belumSo, summaryData);
 
-      if (result.fotoCount > 0) {
+      if (result.fotoCount > 0 || result.xlsxUri) {
         Alert.alert(
           '✅ Export Berhasil',
           `File Excel berhasil dibuat.\n\n📷 ${result.fotoCount} foto tersedia di Galeri HP, album "Daelim SO".`,
@@ -68,7 +70,6 @@ const RekapScreen = () => {
       setLoading(false);
     }
   };
-
 
   const handleBackup = async () => {
     setLoading(true);
@@ -94,6 +95,36 @@ const RekapScreen = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResetAll = () => {
+    Alert.alert(
+      '⚠ RESET SEMUA DATA',
+      'Seluruh hasil Stock Opname akan DIHAPUS PERMANEN. Data master (Excel) tetap aman. Lanjutkan?',
+      [
+        { text: 'Batal', style: 'cancel' },
+        { 
+          text: 'YA, RESET SEMUA', 
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const db = await getDb();
+              if (db) {
+                await db.runAsync('DELETE FROM hasil_so');
+                await db.runAsync('UPDATE ref_accounting SET is_verified = 0');
+                Alert.alert('Sukses', 'Semua hasil SO telah dihapus.');
+                loadData();
+              }
+            } catch (err: any) {
+              Alert.alert('Error', err.message);
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (error) {
@@ -122,28 +153,46 @@ const RekapScreen = () => {
           <ProgressBar progress={stats.progress / 100} color="#1565C0" style={styles.progressBar} />
 
           <Divider style={styles.divider} />
-          <List.Item title="Total Data" right={() => <Text variant="titleMedium">{stats.totalAccounting}</Text>} />
-          <List.Item title="Total Hasil SO" right={() => <Text variant="titleMedium">{stats.sudahSO}</Text>} />
+          <List.Item title="Total Unit (Accounting)" right={() => <Text variant="titleMedium">{stats.totalAccounting} Unit</Text>} />
+          <List.Item 
+            title="Total Unit (Aktual)" 
+            right={() => <Text variant="titleMedium" style={{ color: '#1565C0' }}>{stats.totalAktual} Unit</Text>} 
+          />
+          <List.Item 
+            title="Total Selisih" 
+            right={() => (
+              <Text variant="titleMedium" style={{ color: stats.selisih < 0 ? '#D32F2F' : '#388E3C' }}>
+                {stats.selisih > 0 ? `+${stats.selisih}` : stats.selisih} Unit
+              </Text>
+            )} 
+          />
+          <List.Item title="Progress Tipe Item" right={() => <Text variant="titleMedium">{stats.sudahSO} / {stats.totalTipe}</Text>} />
+          
+          <Divider style={{ marginVertical: 8 }} />
+          
           <List.Item
-            title="MATCH"
+            title="MATCH (Qty Sesuai)"
             titleStyle={{ color: '#4CAF50' }}
             right={() => <Text variant="titleMedium" style={{ color: '#4CAF50' }}>{stats.matchCount}</Text>}
           />
           <List.Item
-            title="BEDA NAMA"
+            title="KURANG (Unit Hilang)"
             titleStyle={{ color: '#FF9800' }}
             right={() => <Text variant="titleMedium" style={{ color: '#FF9800' }}>{stats.bedaNamaCount}</Text>}
           />
           <List.Item
-            title="BARU (tidak di acc)"
+            title="LEBIH (Aset Berlebih)"
             titleStyle={{ color: '#1565C0' }}
-            right={() => <Text variant="titleMedium" style={{ color: '#1565C0' }}>{stats.baruCount}</Text>}
+            right={() => <Text variant="titleMedium" style={{ color: '#1565C0' }}>{stats.lebihCount}</Text>}
           />
           <List.Item
-            title="TIDAK ADA FISIK"
+            title="TIDAK ADA FISIK (0)"
             titleStyle={{ color: '#F44336' }}
             right={() => <Text variant="titleMedium" style={{ color: '#F44336' }}>{stats.tidakAdaFisikCount}</Text>}
           />
+          
+          <Divider style={{ marginVertical: 8 }} />
+
           <List.Item
             title="Belum di-SO"
             titleStyle={{ color: '#757575' }}
@@ -151,8 +200,8 @@ const RekapScreen = () => {
           />
 
           <Divider style={styles.divider} />
-          <List.Item title="Final" right={() => <Text variant="titleMedium">{stats.finalCount}</Text>} />
-          <List.Item title="Draft" right={() => <Text variant="titleMedium">{stats.draftCount}</Text>} />
+          <List.Item title="Status FINAL" right={() => <Text variant="titleMedium">{stats.finalCount}</Text>} />
+          <List.Item title="Status DRAFT" right={() => <Text variant="titleMedium">{stats.draftCount}</Text>} />
         </Card.Content>
       </Card>
 
@@ -177,6 +226,17 @@ const RekapScreen = () => {
         textColor="white"
       >
         BACKUP DATABASE (.DB)
+      </Button>
+
+      <Button
+        mode="outlined"
+        icon="delete-sweep"
+        onPress={handleResetAll}
+        disabled={loading}
+        style={[styles.backupBtn, { backgroundColor: '#B71C1C', borderColor: '#801313', marginTop: 30 }]}
+        textColor="white"
+      >
+        RESET SEMUA HASIL SO
       </Button>
 
       <Text style={styles.hint}>
@@ -219,12 +279,6 @@ const styles = StyleSheet.create({
   },
   exportBtn: {
     backgroundColor: '#2E7D32',
-    borderRadius: 8,
-  },
-  photoBtn: {
-    borderColor: '#1565C0',
-    borderWidth: 1.5,
-    marginTop: 10,
     borderRadius: 8,
   },
   backupBtn: {

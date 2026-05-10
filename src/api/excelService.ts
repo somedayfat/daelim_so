@@ -2,12 +2,11 @@ import * as XLSX from 'xlsx';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Asset } from 'expo-asset';
-import { RefAccounting, HasilSO } from '../constants/types';
+import { RefAccounting, HasilSO, parseFotoPaths } from '../constants/types';
 
 /**
  * Parse file Excel dari URI.
- * Header database.xlsx: No Asset, Nama Asset, Spesifikasi, Pembuat,
- * Daya, Tahun Buat, Tahun Beli, Departemen, No Invoice, Photo, Catatan
+ * V2: Mendukung kolom QTY/Jumlah
  */
 export const parseExcelFile = async (uri: string): Promise<RefAccounting[]> => {
   try {
@@ -31,6 +30,12 @@ export const parseExcelFile = async (uri: string): Promise<RefAccounting[]> => {
       return val === null || val === undefined ? '' : String(val).trim();
     };
 
+    const findNum = (row: any, keys: string[]): number => {
+      const val = findVal(row, keys);
+      const parsed = parseInt(val, 10);
+      return isNaN(parsed) ? 1 : parsed;
+    };
+
     return jsonData
       .map((row: any) => ({
         no_invoice:      findVal(row, ['No Invoice', 'no_invoice', 'Invoice', 'No. Invoice']),
@@ -42,6 +47,7 @@ export const parseExcelFile = async (uri: string): Promise<RefAccounting[]> => {
         tahun_beli:      findVal(row, ['Tahun Beli', 'Thn Beli']),
         departemen:      findVal(row, ['Departemen', 'Dept', 'Location']),
         catatan_acc:     findVal(row, ['Catatan', 'Remarks', 'Keterangan']),
+        qty_accounting:  findNum(row, ['quantity', 'QTY', 'Qty', 'Jumlah', 'Total']),
         is_verified:     0,
       } as RefAccounting))
       .filter(item => item.nama_accounting && item.nama_accounting.length > 0);
@@ -58,14 +64,7 @@ export const loadBundledExcel = async (): Promise<RefAccounting[]> => {
 };
 
 /**
- * Export hasil SO ke Excel.
- *
- * STRATEGI FOTO:
- * - Foto sudah tersimpan di Galeri HP (album "Stock Opname SO") saat diambil
- * - Di Excel, kolom "Nama File Foto" berisi nama file (misal: AST-0001_1234567890.jpg)
- * - Setelah export, ada opsi share foto satu per satu via Android Share Sheet
- *
- * Tidak ada "folder di samping Excel" — folder cache tidak bisa dibuka user.
+ * Export hasil SO ke Excel V2 (Quantity Based)
  */
 export const exportToExcel = async (
   hasilSo: HasilSO[],
@@ -78,54 +77,40 @@ export const exportToExcel = async (
 
   await FileSystem.makeDirectoryAsync(exportDir, { intermediates: true });
 
-  // Kumpulkan path foto yang valid
-  const fotoUris: string[] = [];
-  for (const item of hasilSo) {
-    if (!item.foto_path) continue;
-    try {
-      const info = await FileSystem.getInfoAsync(item.foto_path);
-      if (info.exists) fotoUris.push(item.foto_path);
-    } catch (_) {}
-  }
-
+  const allFotoUris: string[] = [];
+  
   const wb = XLSX.utils.book_new();
 
   // === Sheet 1: Hasil SO ===
   const hasilFormatted = hasilSo.map(item => {
-    // Ambil nama file dari path foto (bukan full path)
-    let namaFileFoto = '';
-    if (item.foto_path) {
-      const parts = item.foto_path.split('/');
-      namaFileFoto = parts[parts.length - 1] || '';
-    }
+    const listFoto = parseFotoPaths(item.foto_paths);
+    listFoto.forEach(p => allFotoUris.push(p));
+
     return {
-      'No Asset':         String(item.no_asset || ''),
-      'Nama Lapangan':    String(item.nama_lapangan || ''),
+      'No SO':            String(item.no_so || ''),
+      'Nama Item':        String(item.nama_lapangan || ''),
       'Nama Accounting':  String(item.nama_accounting || ''),
       'Spesifikasi':      String(item.spesifikasi || ''),
-      'Pembuat/Merk':     String(item.pembuat || ''),
-      'Daya (Kw)':        String(item.daya_kw || ''),
-      'Tahun Buat':       String(item.tahun_buat || ''),
-      'Tahun Beli':       String(item.tahun_beli || ''),
+      'QTY Accounting':   item.qty_accounting || 0,
+      'QTY Aktual':       item.qty_aktual || 0,
+      'Selisih':          item.selisih || 0,
+      'Status':           String(item.status_match || ''),
       'Departemen':       String(item.departemen || ''),
+      'Merk/Pembuat':     String(item.pembuat || ''),
       'No Invoice':       String(item.no_invoice || ''),
-      'Status Pengadaan': String(item.status_pengadaan || ''),
-      'Status Match':     String(item.status_match || ''),
+      'Tahun Beli':       String(item.tahun_beli || ''),
       'Status SO':        String(item.status_so || ''),
       'Catatan':          String(item.catatan || ''),
-      'Ada Foto':         item.foto_path ? 'YA' : 'TIDAK',
-      'Nama File Foto':   namaFileFoto,
-      // Petunjuk mencari foto
-      'Lokasi Foto':      namaFileFoto ? 'Galeri HP → Album: Stock Opname SO' : '',
+      'Jumlah Foto':      listFoto.length,
+      'Lokasi Foto':      listFoto.length > 0 ? 'Galeri HP → Album: Daelim SO' : '',
     };
   });
 
   const wsHasil = XLSX.utils.json_to_sheet(hasilFormatted);
   wsHasil['!cols'] = [
-    {wch:10},{wch:28},{wch:28},{wch:18},{wch:14},
-    {wch:10},{wch:12},{wch:12},{wch:14},{wch:18},
-    {wch:15},{wch:14},{wch:10},{wch:25},{wch:8},
-    {wch:30},{wch:30},
+    {wch:25},{wch:25},{wch:18},{wch:15},{wch:12},
+    {wch:10},{wch:15},{wch:15},{wch:15},{wch:18},
+    {wch:12},{wch:12},{wch:25},{wch:12},{wch:25},
   ];
   XLSX.utils.book_append_sheet(wb, wsHasil, 'Hasil SO');
 
@@ -133,9 +118,8 @@ export const exportToExcel = async (
   const belumFormatted = belumSo.map(item => ({
     'Nama Accounting': String(item.nama_accounting || ''),
     'Spesifikasi':     String(item.spesifikasi || ''),
+    'QTY Target':      item.qty_accounting || 0,
     'Pembuat':         String(item.pembuat || ''),
-    'Daya (Kw)':       String(item.daya_kw || ''),
-    'Tahun Beli':      String(item.tahun_beli || ''),
     'Departemen':      String(item.departemen || ''),
     'No Invoice':      String(item.no_invoice || ''),
   }));
@@ -144,20 +128,20 @@ export const exportToExcel = async (
   // === Sheet 3: Summary ===
   const summaryRow = {
     ...summary,
-    'Total Foto Ada': fotoUris.length,
-    'Lokasi Foto': 'Galeri HP → Album: Stock Opname SO',
+    'Total Foto Diambil': allFotoUris.length,
+    'Album Galeri': 'Daelim SO',
     'Tanggal Export': new Date().toLocaleString('id-ID'),
   };
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([summaryRow]), 'Summary');
 
   // Tulis Excel
   const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
-  const xlsxUri = exportDir + `SO_Asset_${dateStr}.xlsx`;
+  const xlsxUri = exportDir + `Hasil_SO_Daelim_${dateStr}.xlsx`;
   await FileSystem.writeAsStringAsync(xlsxUri, wbout, {
     encoding: FileSystem.EncodingType.Base64,
   });
 
-  // Share file Excel via Android share sheet
+  // Share file Excel
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(xlsxUri, {
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -166,27 +150,5 @@ export const exportToExcel = async (
     });
   }
 
-  return { xlsxUri, fotoCount: fotoUris.length, fotoUris };
-};
-
-/**
- * Share semua foto satu per satu via Android Share Sheet.
- * Dipanggil dari RekapScreen setelah export Excel.
- */
-export const shareAllPhotos = async (fotoUris: string[]): Promise<void> => {
-  if (fotoUris.length === 0) return;
-
-  for (let i = 0; i < fotoUris.length; i++) {
-    const uri = fotoUris[i];
-    try {
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'image/jpeg',
-          dialogTitle: `Simpan Foto ${i + 1} dari ${fotoUris.length}`,
-        });
-      }
-    } catch (err) {
-      console.warn('[shareAllPhotos] Gagal share foto:', uri, err);
-    }
-  }
+  return { xlsxUri, fotoCount: allFotoUris.length, fotoUris: allFotoUris };
 };
