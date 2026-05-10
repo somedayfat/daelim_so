@@ -1,13 +1,17 @@
 import React, { useCallback, useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, Card, Button, ProgressBar, Title, IconButton } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Text, Card, Button, ProgressBar, Title, IconButton, ActivityIndicator } from 'react-native-paper';
 import { useAppStore } from '../store/useAppStore';
 import { useFocusEffect } from '@react-navigation/native';
 import { hasilSoService } from '../api/hasilSoService';
+import * as DocumentPicker from 'expo-document-picker';
+import { parseExcelFile } from '../api/excelService';
+import { accountingService } from '../api/accountingService';
 
 const DashboardScreen = ({ navigation }: any) => {
   const { soSession, stats, setStats } = useAppStore();
   const [refreshing, setRefreshing] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const loadStats = useCallback(async () => {
     setRefreshing(true);
@@ -27,6 +31,54 @@ const DashboardScreen = ({ navigation }: any) => {
     }, [loadStats])
   );
 
+  const handleImportExcel = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel',
+          '*/*',
+        ],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) return;
+      const file = result.assets[0];
+
+      setImporting(true);
+
+      const parsed = await parseExcelFile(file.uri);
+      if (parsed.length === 0) {
+        Alert.alert('Perhatian', 'File tidak berisi data yang bisa dibaca.\nPastikan header kolom sesuai:\nNama Asset, Spesifikasi, Pembuat, Daya, dll.');
+        return;
+      }
+
+      Alert.alert(
+        'Konfirmasi Import',
+        `Ditemukan ${parsed.length} data di file "${file.name}".\n\nData lama akan DITIMPA. Lanjutkan?`,
+        [
+          { text: 'Batal', style: 'cancel' },
+          {
+            text: 'Import',
+            onPress: async () => {
+              try {
+                const { imported, skipped } = await accountingService.importAccountingData(parsed);
+                Alert.alert('✅ Import Berhasil', `${imported} data berhasil diimport.${skipped > 0 ? `\n${skipped} baris dilewati (nama kosong).` : ''}`);
+                loadStats();
+              } catch (err: any) {
+                Alert.alert('Error', 'Gagal import: ' + err.message);
+              }
+            },
+          },
+        ]
+      );
+    } catch (err: any) {
+      Alert.alert('Error', 'Gagal membuka file: ' + err.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -42,7 +94,7 @@ const DashboardScreen = ({ navigation }: any) => {
           <Text variant="titleMedium">Progress Stock Opname</Text>
           <ProgressBar progress={stats.progress / 100} color="#1565C0" style={styles.progress} />
           <View style={styles.statsRow}>
-            <Text>{stats.sudahSO} / {stats.totalAccounting} Mesin</Text>
+            <Text>{stats.sudahSO} / {stats.totalAccounting} Item</Text>
             <Text>{stats.progress}%</Text>
           </View>
         </Card.Content>
@@ -64,30 +116,41 @@ const DashboardScreen = ({ navigation }: any) => {
       </View>
 
       <View style={styles.buttonGrid}>
-        <Button 
-          mode="contained" 
-          onPress={() => navigation.navigate('Import')} 
-          style={styles.button}
-          icon="file-import"
-        >
-          Import Data Accounting
-        </Button>
-        <Button 
-          mode="contained" 
-          onPress={() => navigation.navigate('SOList')} 
+        <Button
+          mode="contained"
+          onPress={() => navigation.navigate('SOList')}
           style={styles.button}
           icon="magnify"
         >
           Mulai Stock Opname
         </Button>
-        <Button 
-          mode="outlined" 
-          onPress={() => navigation.navigate('Rekap')} 
+        <Button
+          mode="outlined"
+          onPress={() => navigation.navigate('Rekap')}
           style={styles.button}
           icon="chart-bar"
         >
-          Rekap & Export Excel
+          Rekap &amp; Export Excel
         </Button>
+
+        {/* Import Data Referensi */}
+        <Button
+          mode="outlined"
+          onPress={handleImportExcel}
+          style={styles.importBtn}
+          icon={importing ? undefined : 'file-import'}
+          disabled={importing}
+          textColor="#2E7D32"
+        >
+          {importing ? (
+            <ActivityIndicator size="small" color="#2E7D32" />
+          ) : (
+            'Import Data Referensi (.xlsx)'
+          )}
+        </Button>
+        <Text style={styles.importHint}>
+          Upload file Excel dengan kolom: Nama Asset, Spesifikasi, Pembuat, Daya, Tahun Buat, Tahun Beli, Departemen, No Invoice, Catatan
+        </Text>
       </View>
     </ScrollView>
   );
@@ -138,7 +201,20 @@ const styles = StyleSheet.create({
   },
   button: {
     paddingVertical: 4,
-  }
+  },
+  importBtn: {
+    borderColor: '#2E7D32',
+    borderWidth: 1.5,
+    paddingVertical: 2,
+    marginTop: 4,
+  },
+  importHint: {
+    fontSize: 11,
+    color: '#757575',
+    textAlign: 'center',
+    lineHeight: 16,
+    paddingHorizontal: 8,
+  },
 });
 
 export default DashboardScreen;

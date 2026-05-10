@@ -31,11 +31,32 @@ const ImportScreen = ({ navigation }: any) => {
   const handleImport = async () => {
     if (previewData.length === 0) return;
 
+    const hasExisting = await accountingService.hasData();
+
+    if (hasExisting) {
+      return new Promise<void>((resolve) => {
+        Alert.alert(
+          'Peringatan',
+          'Data lama akan ditimpa. Semua data accounting yang sudah ada akan dihapus. Lanjutkan?',
+          [
+            { text: 'Batal', style: 'cancel', onPress: () => resolve() },
+            { text: 'Ya, Timpa Data', style: 'destructive', onPress: () => resolve(doImport()) }
+          ]
+        );
+      });
+    }
+
+    await doImport();
+  };
+
+  const doImport = async () => {
     setLoading(true);
     try {
-      await accountingService.importAccountingData(previewData);
+      const result = await accountingService.importAccountingData(previewData);
       setLoading(false);
-      Alert.alert('Sukses', `${previewData.length} data berhasil diimport!`, [
+      const msg = `Berhasil import ${result.imported} data.`;
+      const extra = result.skipped > 0 ? `\n${result.skipped} baris dilewati (nama kosong).` : '';
+      Alert.alert('Sukses', msg + extra, [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (error: any) {
@@ -49,12 +70,15 @@ const ImportScreen = ({ navigation }: any) => {
       <Card style={styles.card}>
         <Card.Content>
           <Title>Import Data Accounting</Title>
-          <Text variant="bodySmall" style={{ marginBottom: 15 }}>
-            Pilih file Excel (.xlsx) yang berisi daftar aset perusahaan.
+          <Text variant="bodySmall" style={{ marginBottom: 4 }}>
+            Pilih file Excel (.xlsx) atau CSV yang berisi daftar aset perusahaan.
           </Text>
-          <Button 
-            mode="contained" 
-            icon="file-upload" 
+          <Text variant="bodySmall" style={{ marginBottom: 15, color: '#d32f2f' }}>
+            Format kolom: Nama Asset, Spesifikasi/Standar, Pembuat, Daya (Kw), No Invoice, Tahun Buat, Tahun Beli, Departemen, Catatan
+          </Text>
+          <Button
+            mode="contained"
+            icon="file-upload"
             onPress={handlePickFile}
             loading={loading}
             disabled={loading}
@@ -72,7 +96,7 @@ const ImportScreen = ({ navigation }: any) => {
               <List.Item
                 key={index}
                 title={item.nama_accounting}
-                description={`Inv: ${item.no_invoice || '-'} | Dept: ${item.departemen || '-'}`}
+                description={`Inv: ${item.no_invoice || '-'} | Dept: ${item.departemen || '-'} | Daya: ${item.daya_kw || '-'}`}
                 left={props => <List.Icon {...props} icon="database" />}
               />
             ))}
@@ -82,12 +106,12 @@ const ImportScreen = ({ navigation }: any) => {
               </Text>
             )}
           </ScrollView>
-          
+
           <Divider />
           <View style={styles.footer}>
-            <Button 
-              mode="contained" 
-              onPress={handleImport} 
+            <Button
+              mode="contained"
+              onPress={handleImport}
               style={styles.importBtn}
               loading={loading}
               disabled={loading}

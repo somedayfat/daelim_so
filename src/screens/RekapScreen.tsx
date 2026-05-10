@@ -1,25 +1,28 @@
 import React, { useState, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Text, Title, Card, Button, Divider, List, ActivityIndicator } from 'react-native-paper';
+import { Text, Title, Card, Button, Divider, List, ActivityIndicator, ProgressBar } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
-import { hasilSoService } from '../api/hasilSoService';
+import { hasilSoService, RekapDetailStats } from '../api/hasilSoService';
 import { accountingService } from '../api/accountingService';
 import { exportToExcel } from '../api/excelService';
-// @ts-ignore
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { SODashboardStats } from '../constants/types';
+import { useAppStore } from '../store/useAppStore';
 
 const RekapScreen = () => {
-  const [stats, setStats] = useState<SODashboardStats | null>(null);
+  const { soSession } = useAppStore();
+  const [stats, setStats] = useState<RekapDetailStats | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
+    setError(null);
     try {
-      const data = await hasilSoService.getSummaryStats();
+      const data = await hasilSoService.getDetailedStats();
       setStats(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Load stats error:', e);
+      setError('Gagal memuat data: ' + (e?.message || 'Unknown error'));
     }
   }, []);
 
@@ -30,34 +33,54 @@ const RekapScreen = () => {
   );
 
   const handleExport = async () => {
+    if (!stats) return;
     setLoading(true);
     try {
       const hasilSo = await hasilSoService.getAllHasil('', 'Semua');
       const belumSo = await accountingService.getUnverified();
-      
+
       const summaryData = {
-        'Sesi SO': 'SO-2024-001',
-        'Tanggal Export': new Date().toLocaleString(),
-        'Total Accounting': stats?.totalAccounting || 0,
-        'Sudah di-SO': stats?.sudahSO || 0,
-        'Belum di-SO': stats?.belumSO || 0,
-        'Asset Baru': stats?.assetBaru || 0,
-        'Progress (%)': stats?.progress || 0
+        'Sesi SO': soSession,
+        'Total Data Accounting': stats.totalAccounting,
+        'Total Hasil SO': stats.sudahSO,
+        'MATCH': stats.matchCount,
+        'BEDA NAMA': stats.bedaNamaCount,
+        'BARU': stats.baruCount,
+        'TIDAK ADA FISIK': stats.tidakAdaFisikCount,
+        'Belum di-SO': stats.belumSO,
+        'Final': stats.finalCount,
+        'Draft': stats.draftCount,
+        'Progress (%)': stats.progress
       };
 
-      await exportToExcel(hasilSo, belumSo, summaryData);
+      const result = await exportToExcel(hasilSo, belumSo, summaryData);
+
+      if (result.fotoCount > 0) {
+        Alert.alert(
+          '✅ Export Berhasil',
+          `File Excel berhasil dibuat.\n\n📷 ${result.fotoCount} foto tersedia di Galeri HP, album "Daelim SO".`,
+          [{ text: 'OK' }]
+        );
+      }
     } catch (error: any) {
-      console.error('Export handling error:', error);
       Alert.alert('Error', 'Gagal mengekspor data: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
+
   const handleBackup = async () => {
     setLoading(true);
     try {
-      const dbPath = ((FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '') + 'SQLite/asset_so.db';
+      const dbPath = FileSystem.documentDirectory + 'SQLite/asset_so.db';
+      const dbInfo = await FileSystem.getInfoAsync(dbPath);
+      if (!dbInfo.exists) {
+        Alert.alert('Error', 'File database tidak ditemukan');
+        setLoading(false);
+        return;
+      }
+
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(dbPath, {
           dialogTitle: 'Backup Database',
@@ -73,47 +96,69 @@ const RekapScreen = () => {
     }
   };
 
-  if (!stats) return <ActivityIndicator style={{ flex: 1 }} color="#1565C0" />;
+  if (error) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ color: '#F44336', marginBottom: 10 }}>{error}</Text>
+        <Button mode="outlined" onPress={loadData}>Coba Lagi</Button>
+      </View>
+    );
+  }
+
+  if (!stats) return <ActivityIndicator style={styles.center} color="#1565C0" />;
 
   return (
     <ScrollView style={styles.container}>
       <Card style={styles.card}>
         <Card.Content>
-          <Title style={styles.title}>📊 RINGKASAN STOCK OPNAME</Title>
-          <Text variant="bodySmall" style={{ textAlign: 'center' }}>Sesi: SO-2024-001</Text>
+          <Title style={styles.title}>RINGKASAN STOCK OPNAME</Title>
+          <Text variant="bodySmall" style={{ textAlign: 'center' }}>Sesi: {soSession}</Text>
           <Divider style={styles.divider} />
-          
-          <List.Item
-            title="Total Data Accounting"
-            right={() => <Text variant="titleMedium">{stats.totalAccounting}</Text>}
-          />
-          <List.Item
-            title="Sudah Terverifikasi (SO)"
-            titleStyle={{ color: '#4CAF50' }}
-            right={() => <Text variant="titleMedium" style={{ color: '#4CAF50' }}>{stats.sudahSO}</Text>}
-          />
-          <List.Item
-            title="Belum Ditemukan"
-            titleStyle={{ color: '#F44336' }}
-            right={() => <Text variant="titleMedium" style={{ color: '#F44336' }}>{stats.belumSO}</Text>}
-          />
-          <List.Item
-            title="Aset Baru (Luar List)"
-            titleStyle={{ color: '#1565C0' }}
-            right={() => <Text variant="titleMedium" style={{ color: '#1565C0' }}>{stats.assetBaru}</Text>}
-          />
-          
-          <Divider style={styles.divider} />
+
           <View style={styles.progressRow}>
-            <Text variant="titleLarge">Progress Akhir:</Text>
+            <Text variant="titleLarge">Progress:</Text>
             <Text variant="displaySmall" style={{ color: '#1565C0', fontWeight: 'bold' }}>{stats.progress}%</Text>
           </View>
+          <ProgressBar progress={stats.progress / 100} color="#1565C0" style={styles.progressBar} />
+
+          <Divider style={styles.divider} />
+          <List.Item title="Total Data" right={() => <Text variant="titleMedium">{stats.totalAccounting}</Text>} />
+          <List.Item title="Total Hasil SO" right={() => <Text variant="titleMedium">{stats.sudahSO}</Text>} />
+          <List.Item
+            title="MATCH"
+            titleStyle={{ color: '#4CAF50' }}
+            right={() => <Text variant="titleMedium" style={{ color: '#4CAF50' }}>{stats.matchCount}</Text>}
+          />
+          <List.Item
+            title="BEDA NAMA"
+            titleStyle={{ color: '#FF9800' }}
+            right={() => <Text variant="titleMedium" style={{ color: '#FF9800' }}>{stats.bedaNamaCount}</Text>}
+          />
+          <List.Item
+            title="BARU (tidak di acc)"
+            titleStyle={{ color: '#1565C0' }}
+            right={() => <Text variant="titleMedium" style={{ color: '#1565C0' }}>{stats.baruCount}</Text>}
+          />
+          <List.Item
+            title="TIDAK ADA FISIK"
+            titleStyle={{ color: '#F44336' }}
+            right={() => <Text variant="titleMedium" style={{ color: '#F44336' }}>{stats.tidakAdaFisikCount}</Text>}
+          />
+          <List.Item
+            title="Belum di-SO"
+            titleStyle={{ color: '#757575' }}
+            right={() => <Text variant="titleMedium" style={{ color: '#757575' }}>{stats.belumSO}</Text>}
+          />
+
+          <Divider style={styles.divider} />
+          <List.Item title="Final" right={() => <Text variant="titleMedium">{stats.finalCount}</Text>} />
+          <List.Item title="Draft" right={() => <Text variant="titleMedium">{stats.draftCount}</Text>} />
         </Card.Content>
       </Card>
 
-      <Button 
-        mode="contained" 
-        icon="file-excel" 
+      <Button
+        mode="contained"
+        icon="file-excel"
         onPress={handleExport}
         loading={loading}
         disabled={loading}
@@ -123,19 +168,20 @@ const RekapScreen = () => {
         EKSPOR HASIL KE EXCEL
       </Button>
 
-      <Button 
-        mode="outlined" 
-        icon="database-export" 
+      <Button
+        mode="outlined"
+        icon="database-export"
         onPress={handleBackup}
         disabled={loading}
-        style={[styles.exportBtn, { backgroundColor: '#1565C0', marginTop: 10, borderColor: '#1565C0' }]}
+        style={styles.backupBtn}
         textColor="white"
       >
         BACKUP DATABASE (.DB)
       </Button>
 
       <Text style={styles.hint}>
-        *File akan berisi 3 Sheet: Hasil Lapangan, Item Belum SO, dan Summary Angka.
+        📊 Excel: 3 Sheet (Hasil SO, Belum SO, Summary){`\n`}
+        📷 Foto otomatis tersimpan ke Galeri HP, album "Daelim SO"
       </Text>
     </ScrollView>
   );
@@ -158,14 +204,33 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   divider: {
-    marginVertical: 15,
+    marginVertical: 12,
   },
   progressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginVertical: 10,
+    marginTop: 8,
+  },
+  progressBar: {
+    height: 12,
+    borderRadius: 6,
+    marginTop: 8,
   },
   exportBtn: {
     backgroundColor: '#2E7D32',
+    borderRadius: 8,
+  },
+  photoBtn: {
+    borderColor: '#1565C0',
+    borderWidth: 1.5,
+    marginTop: 10,
+    borderRadius: 8,
+  },
+  backupBtn: {
+    backgroundColor: '#1565C0',
+    borderColor: '#0D47A1',
+    marginTop: 10,
     borderRadius: 8,
   },
   hint: {
@@ -173,6 +238,11 @@ const styles = StyleSheet.create({
     marginTop: 15,
     color: '#757575',
     fontSize: 12,
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   }
 });
 
