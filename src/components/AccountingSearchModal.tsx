@@ -49,9 +49,11 @@ const AccountingSearchModal = ({ visible, onDismiss, onSelect }: Props) => {
     }
     const filtered = items.filter((item) => {
       const nama = item.nama_accounting ? String(item.nama_accounting).toLowerCase() : '';
+      const maint = item.nama_maintenance ? String(item.nama_maintenance).toLowerCase() : '';
       const inv = item.no_invoice ? String(item.no_invoice).toLowerCase() : '';
+      const po = item.no_po ? String(item.no_po).toLowerCase() : '';
       const dept = item.departemen ? String(item.departemen).toLowerCase() : '';
-      return nama.includes(q) || inv.includes(q) || dept.includes(q);
+      return nama.includes(q) || maint.includes(q) || inv.includes(q) || po.includes(q) || dept.includes(q);
     });
     setFilteredItems(filtered);
   }, [search, items]);
@@ -69,7 +71,7 @@ const AccountingSearchModal = ({ visible, onDismiss, onSelect }: Props) => {
         </View>
 
         <Searchbar
-          placeholder="Ketik nama mesin..."
+          placeholder="Cari nama / po / invoice..."
           onChangeText={setSearch}
           value={search}
           style={styles.search}
@@ -91,13 +93,12 @@ const AccountingSearchModal = ({ visible, onDismiss, onSelect }: Props) => {
           renderItem={({ item }) => (
             <TouchableOpacity onPress={() => onSelect(item)}>
               <List.Item
-                title={String(item.nama_accounting || '-')}
+                title={String(item.nama_maintenance || item.nama_accounting || '-')}
                 description={[
+                  item.nama_maintenance ? `Ref: ${item.nama_accounting}` : '',
                   item.spesifikasi,
-                  item.daya_kw ? `${item.daya_kw} Kw` : '',
-                  `Qty: ${item.qty_accounting || 1}`,
+                  item.no_po ? `PO: ${item.no_po}` : '',
                   item.departemen,
-                  item.no_invoice ? `Inv: ${item.no_invoice}` : '',
                 ]
                   .filter(Boolean)
                   .join(' | ') || '-'}

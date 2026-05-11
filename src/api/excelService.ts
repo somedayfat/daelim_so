@@ -32,22 +32,23 @@ export const parseExcelFile = async (uri: string): Promise<RefAccounting[]> => {
 
     const findNum = (row: any, keys: string[]): number => {
       const val = findVal(row, keys);
-      const parsed = parseInt(val, 10);
-      return isNaN(parsed) ? 1 : parsed;
+      // Remove non-numeric chars except . for price/qty
+      const cleaned = val.replace(/[^\d.]/g, '');
+      const parsed = parseFloat(cleaned);
+      return isNaN(parsed) ? 0 : parsed;
     };
 
     return jsonData
       .map((row: any) => ({
-        no_invoice:      findVal(row, ['No Invoice', 'no_invoice', 'Invoice', 'No. Invoice']),
-        nama_accounting: findVal(row, ['Nama Asset', 'Nama Accounting', 'Nama Mesin', 'Description']),
-        spesifikasi:     findVal(row, ['Spesifikasi', 'Spec', 'Standar']),
-        pembuat:         findVal(row, ['Pembuat', 'Merk', 'Brand', 'Maker']),
-        daya_kw:         findVal(row, ['Daya', 'Daya (Kw)', 'Kw', 'Power']),
-        tahun_buat:      findVal(row, ['Tahun Buat', 'Thn Buat']),
-        tahun_beli:      findVal(row, ['Tahun Beli', 'Thn Beli']),
-        departemen:      findVal(row, ['Departemen', 'Dept', 'Location']),
-        catatan_acc:     findVal(row, ['Catatan', 'Remarks', 'Keterangan']),
-        qty_accounting:  findNum(row, ['quantity', 'QTY', 'Qty', 'Jumlah', 'Total']),
+        nama_accounting: findVal(row, ['FIXED ASSET', 'Nama Asset', 'Description']),
+        nama_maintenance: findVal(row, ['Nama Maintenance', 'Nama di Maintenance']),
+        spesifikasi:     findVal(row, ['TYPE', 'Spesifikasi']),
+        pembuat:         findVal(row, ['MAKER', 'Pembuat', 'Merk']),
+        qty_accounting:  findNum(row, ['UNIT', 'Qty', 'Jumlah']) || 1,
+        // Data pendukung opsional tetap saya biarkan fiturnya jika sewaktu-waktu ada
+        no_invoice:      findVal(row, ['Invoice No', 'No Invoice']),
+        no_po:           findVal(row, ['PO Number', 'No PO']),
+        departemen:      findVal(row, ['Departemen', 'Dept']),
         is_verified:     0,
       } as RefAccounting))
       .filter(item => item.nama_accounting && item.nama_accounting.length > 0);
@@ -101,6 +102,7 @@ export const exportToExcel = async (
       'Thn Buat':         String(item.tahun_buat || ''),
       'Thn Beli':         String(item.tahun_beli || ''),
       'No Invoice':       String(item.no_invoice || ''),
+      'No PO':            String(item.no_po || ''),
       'Pengadaan':        String(item.status_pengadaan || ''),
       'Kondisi':          String(item.kondisi || ''),
       'Status SO':        String(item.status_so || ''),

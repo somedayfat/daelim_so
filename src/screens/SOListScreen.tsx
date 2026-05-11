@@ -39,8 +39,8 @@ const SOListScreen = ({ navigation }: any) => {
       `Yakin ingin menghapus hasil SO untuk "${item.nama_lapangan || item.nama_accounting}"?`,
       [
         { text: 'Batal', style: 'cancel' },
-        { 
-          text: 'Hapus', 
+        {
+          text: 'Hapus',
           style: 'destructive',
           onPress: async () => {
             if (item.id) {
@@ -54,7 +54,7 @@ const SOListScreen = ({ navigation }: any) => {
   };
 
   const getMatchCode = (status: string) => {
-    switch(status) {
+    switch (status) {
       case 'MATCH': return 'MC';
       case 'KURANG': return 'KR';
       case 'LEBIH': return 'LB';
@@ -126,11 +126,11 @@ const SOListScreen = ({ navigation }: any) => {
                 >
                   {item.status_so}
                 </Badge>
-                <IconButton 
-                  icon="delete" 
-                  size={20} 
-                  iconColor="#F44336" 
-                  onPress={() => handleConfirmDelete(item)} 
+                <IconButton
+                  icon="delete"
+                  size={20}
+                  iconColor="#F44336"
+                  onPress={() => handleConfirmDelete(item)}
                 />
               </View>
             )}

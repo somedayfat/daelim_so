@@ -23,7 +23,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
-import { HasilSO, RefAccounting, computeQtyStatus, parseFotoPaths, stringifyFotoPaths } from '../constants/types';
+import { HasilSO, RefAccounting, computeQtyStatus, parseFotoPaths, stringifyFotoPaths, DEPARTMENTS_LIST } from '../constants/types';
 import { hasilSoService } from '../api/hasilSoService';
 import { generateNextSoNumber } from '../api/utils';
 import { accountingService } from '../api/accountingService';
@@ -41,6 +41,7 @@ const SOFormScreen = ({ route, navigation }: any) => {
   const [accData, setAccData] = useState<RefAccounting[]>([]);
   const [linkedAccounting, setLinkedAccounting] = useState<RefAccounting | null>(null);
   const [prevQty, setPrevQty] = useState(0);
+  const [deptSuggestions, setDeptSuggestions] = useState<string[]>([]);
 
   // V2 State
   const [fotoList, setFotoList] = useState<string[]>([]);
@@ -54,6 +55,7 @@ const SOFormScreen = ({ route, navigation }: any) => {
     tahun_beli: '',
     departemen: '',
     no_invoice: '',
+    no_po: '',
     qty_accounting: 0,
     qty_aktual: 0,
     status_pengadaan: 'Beli',
@@ -107,8 +109,8 @@ const SOFormScreen = ({ route, navigation }: any) => {
       const lower = text.toLowerCase();
       const filtered = accData
         .filter(item =>
-          item.nama_accounting != null &&
-          String(item.nama_accounting).toLowerCase().includes(lower)
+          (item.nama_accounting != null && String(item.nama_accounting).toLowerCase().includes(lower)) ||
+          (item.nama_maintenance != null && String(item.nama_maintenance).toLowerCase().includes(lower))
         )
         .slice(0, 8);
       setSuggestions(filtered);
@@ -164,18 +166,18 @@ const SOFormScreen = ({ route, navigation }: any) => {
       const newStatus = computeQtyStatus(prev.qty_aktual || 0, accQty, true);
       return {
         ...prev,
-        nama_lapangan: acc.nama_accounting,
         nama_accounting: acc.nama_accounting,
         ref_accounting_id: acc.id,
         spesifikasi: acc.spesifikasi || prev.spesifikasi,
         pembuat: acc.pembuat || prev.pembuat,
         daya_kw: acc.daya_kw || prev.daya_kw,
         tahun_buat: acc.tahun_buat || prev.tahun_buat,
-        tahun_beli: acc.tahun_beli || prev.tahun_beli,
-        no_invoice: acc.no_invoice || prev.no_invoice,
+        no_po: acc.no_po || prev.no_po,
         departemen: acc.departemen || prev.departemen,
+
         qty_accounting: accQty,
         status_match: newStatus,
+        nama_lapangan: acc.nama_maintenance || acc.nama_accounting, // Default to maintenance name if exists
       };
     });
     if (acc.id) loadPrevQty(acc.id);
@@ -197,16 +199,30 @@ const SOFormScreen = ({ route, navigation }: any) => {
 
   const updateField = (field: keyof HasilSO) => (value: any) => {
     setForm(prev => {
-      const updated = { ...prev, [field]: value };
-      if (field === 'qty_aktual') {
-        updated.status_match = computeQtyStatus(
-          Number(value),
-          prev.qty_accounting || 0,
-          !!prev.ref_accounting_id
+      const newForm = { ...prev, [field]: value };
+      
+      // Update status match jika qty berubah
+      if (field === 'qty_aktual' || field === 'qty_accounting') {
+        newForm.status_match = computeQtyStatus(
+          Number(newForm.qty_aktual || 0), 
+          Number(newForm.qty_accounting || 0),
+          !!newForm.ref_accounting_id
         );
       }
-      return updated;
+      return newForm;
     });
+
+    // Suggestion Departemen
+    if (field === 'departemen') {
+      if (value.length > 0) {
+        const filtered = DEPARTMENTS_LIST.filter(d => 
+          d.toLowerCase().includes(value.toLowerCase()) && d.toLowerCase() !== value.toLowerCase()
+        ).slice(0, 5);
+        setDeptSuggestions(filtered);
+      } else {
+        setDeptSuggestions([]);
+      }
+    }
   };
 
   const handleSave = async (status: 'DRAFT' | 'FINAL') => {
@@ -362,8 +378,13 @@ const SOFormScreen = ({ route, navigation }: any) => {
               <View style={styles.suggestionBox}>
                 {suggestions.map((item, idx) => (
                   <TouchableOpacity key={idx} onPress={() => handleSelectAccounting(item)} style={styles.suggestionItem}>
-                    <Text style={{ fontWeight: 'bold' }}>{item.nama_accounting}</Text>
-                    <Text variant="bodySmall" style={{ color: '#757575' }}>
+                    <Text style={{ fontWeight: 'bold', color: '#1565C0' }}>
+                      {item.nama_maintenance || '(Tanpa Nama Maintenance)'}
+                    </Text>
+                    <Text variant="bodySmall" style={{ color: '#444' }}>
+                      Ref: {item.nama_accounting}
+                    </Text>
+                    <Text variant="labelSmall" style={{ color: '#757575' }}>
                       {item.spesifikasi} | Qty: {item.qty_accounting}
                     </Text>
                   </TouchableOpacity>
@@ -405,31 +426,39 @@ const SOFormScreen = ({ route, navigation }: any) => {
                 style={[styles.input, styles.half]}
               />
               <TextInput
-                label="Thn Beli"
-                value={form.tahun_beli}
-                onChangeText={updateField('tahun_beli')}
+                label="No PO"
+                value={form.no_po}
+                onChangeText={updateField('no_po')}
                 mode="outlined"
                 style={[styles.input, styles.half]}
               />
             </View>
 
-            <View style={styles.row}>
-              <TextInput
-                label="No Invoice"
-                value={form.no_invoice}
-                onChangeText={updateField('no_invoice')}
-                mode="outlined"
-                style={[styles.input, styles.half]}
-              />
+            <View>
               <TextInput
                 label="Departemen*"
                 value={form.departemen}
                 onChangeText={updateField('departemen')}
                 mode="outlined"
-                style={[styles.input, styles.half]}
+                style={styles.input}
               />
+              {deptSuggestions.length > 0 && (
+                <View style={styles.deptSuggestions}>
+                  {deptSuggestions.map((item, idx) => (
+                    <TouchableOpacity 
+                      key={idx} 
+                      style={styles.deptSuggestionItem}
+                      onPress={() => {
+                        updateField('departemen')(item);
+                        setDeptSuggestions([]);
+                      }}
+                    >
+                      <Text>{item}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
-
             <TextInput
               label="Catatan"
               value={form.catatan}
@@ -467,7 +496,24 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   card: { margin: 10, elevation: 2 },
   sectionTitle: { color: '#1565C0', fontWeight: 'bold', marginBottom: 10, fontSize: 14 },
-  input: { marginBottom: 10, backgroundColor: '#fff' },
+  input: {
+    marginBottom: 12,
+  },
+  deptSuggestions: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    marginTop: -8,
+    marginBottom: 12,
+    elevation: 3,
+    zIndex: 1000,
+  },
+  deptSuggestionItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
   row: { flexDirection: 'row', gap: 10 },
   half: { flex: 1 },
   

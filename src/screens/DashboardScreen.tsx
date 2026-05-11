@@ -92,9 +92,9 @@ const DashboardScreen = ({ navigation }: any) => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Image 
-          source={require('../../assets/icon.png')} 
-          style={styles.logo} 
+        <Image
+          source={require('../../assets/icon.png')}
+          style={styles.logo}
           resizeMode="contain"
         />
         <View style={{ flex: 1, marginLeft: 12 }}>
@@ -183,7 +183,7 @@ const DashboardScreen = ({ navigation }: any) => {
             style={styles.searchbar}
             inputStyle={{ minHeight: 0 }}
           />
-          
+
           <DataTable>
             <DataTable.Header>
               <DataTable.Title style={{ flex: 3 }}>Nama / Spesifikasi</DataTable.Title>
@@ -192,7 +192,7 @@ const DashboardScreen = ({ navigation }: any) => {
             </DataTable.Header>
 
             {statusList
-              .filter(item => 
+              .filter(item =>
                 String(item.nama_accounting).toLowerCase().includes(searchQuery.toLowerCase()) ||
                 String(item.spesifikasi).toLowerCase().includes(searchQuery.toLowerCase())
               )
@@ -200,7 +200,7 @@ const DashboardScreen = ({ navigation }: any) => {
               .map((item, idx) => {
                 const isMatch = item.qty_aktual === item.qty_accounting;
                 const isZero = item.qty_aktual === 0;
-                
+
                 return (
                   <DataTable.Row key={idx}>
                     <DataTable.Cell style={{ flex: 3 }}>
@@ -210,9 +210,9 @@ const DashboardScreen = ({ navigation }: any) => {
                       </View>
                     </DataTable.Cell>
                     <DataTable.Cell numeric style={{ flex: 1 }}>
-                      <Text style={{ 
+                      <Text style={{
                         color: isMatch ? '#2e7d32' : (isZero ? '#d32f2f' : '#1565C0'),
-                        fontWeight: 'bold' 
+                        fontWeight: 'bold'
                       }}>
                         {item.qty_aktual}
                       </Text>
@@ -225,14 +225,14 @@ const DashboardScreen = ({ navigation }: any) => {
             <DataTable.Pagination
               page={page}
               numberOfPages={Math.ceil(
-                statusList.filter(item => 
+                statusList.filter(item =>
                   String(item.nama_accounting).toLowerCase().includes(searchQuery.toLowerCase()) ||
                   String(item.spesifikasi).toLowerCase().includes(searchQuery.toLowerCase())
                 ).length / itemsPerPage
               )}
               onPageChange={(page) => setPage(page)}
               label={`${page + 1} of ${Math.ceil(
-                statusList.filter(item => 
+                statusList.filter(item =>
                   String(item.nama_accounting).toLowerCase().includes(searchQuery.toLowerCase()) ||
                   String(item.spesifikasi).toLowerCase().includes(searchQuery.toLowerCase())
                 ).length / itemsPerPage
@@ -240,12 +240,12 @@ const DashboardScreen = ({ navigation }: any) => {
               showFastPaginationControls
               numberOfItemsPerPage={itemsPerPage}
             />
-            
+
             <Divider />
-            <Button 
-              onPress={() => navigation.navigate('SOList')} 
-              mode="text" 
-              compact 
+            <Button
+              onPress={() => navigation.navigate('SOList')}
+              mode="text"
+              compact
               style={{ marginTop: 5 }}
             >
               Lanjut Input SO ({statusList.length} Tipe)

@@ -1,5 +1,5 @@
 import { getDb } from './database';
-import { RefAccounting } from '../constants/types';
+import { RefAccounting, DEPARTMENTS_LIST } from '../constants/types';
 
 export const accountingService = {
   importAccountingData: async (data: RefAccounting[]) => {
@@ -16,8 +16,9 @@ export const accountingService = {
       if (!item.nama_accounting) continue;
       
       const cleanName = item.nama_accounting.trim().toLowerCase();
+      const cleanMaint = (item.nama_maintenance || '').trim().toLowerCase();
       const cleanSpec = (item.spesifikasi || '').trim().toLowerCase();
-      const key = `${cleanName}_${cleanSpec}`;
+      const key = `${cleanName}_${cleanMaint}_${cleanSpec}`;
       
       if (groupedData[key]) {
         // Jika sudah ada, tambahkan QTY-nya
@@ -41,12 +42,14 @@ export const accountingService = {
     for (const item of finalItems) {
       await db.runAsync(
         `INSERT INTO ref_accounting (
-          no_invoice, nama_accounting, spesifikasi, pembuat,
+          no_invoice, no_po, nama_accounting, nama_maintenance, spesifikasi, pembuat,
           daya_kw, tahun_buat, tahun_beli, departemen, catatan_acc, qty_accounting
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           String(item.no_invoice  || ''),
+          String(item.no_po       || ''),
           String(item.nama_accounting  || ''),
+          String(item.nama_maintenance || ''),
           String(item.spesifikasi || ''),
           String(item.pembuat     || ''),
           String(item.daya_kw     || ''),
@@ -89,8 +92,8 @@ export const accountingService = {
     if (!db) return [];
     try {
       const rows = await db.getAllAsync<RefAccounting>(
-        'SELECT * FROM ref_accounting WHERE (nama_accounting LIKE ? OR no_invoice LIKE ?) AND nama_accounting IS NOT NULL LIMIT 20',
-        [`%${query}%`, `%${query}%`]
+        'SELECT * FROM ref_accounting WHERE (nama_accounting LIKE ? OR nama_maintenance LIKE ? OR no_invoice LIKE ? OR no_po LIKE ?) AND nama_accounting IS NOT NULL LIMIT 20',
+        [`%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`]
       );
       return rows.filter(r => r.nama_accounting != null && String(r.nama_accounting).trim() !== '');
     } catch (err: any) {
@@ -129,15 +132,20 @@ export const accountingService = {
       `;
       const params: any[] = [];
       if (dept !== 'Semua') {
-        sql += ' WHERE r.departemen = ?';
-        params.push(dept);
+        if (dept === 'Unlisted') {
+          sql += ' WHERE (r.departemen IS NULL OR r.departemen = "" OR r.departemen = "Unlisted")';
+        } else {
+          sql += ' WHERE r.departemen = ?';
+          params.push(dept);
+        }
       }
       sql += ' ORDER BY r.nama_accounting ASC';
 
       const rows = await db.getAllAsync<any>(sql, params);
       return rows.map(r => ({
         ...r,
-        qty_aktual: r.qty_aktual || 0
+        qty_aktual: r.qty_aktual || 0,
+        departemen: r.departemen || 'Unlisted'
       }));
     } catch (err: any) {
       console.error('[accountingService.getSOStatusList] error:', err);
@@ -147,14 +155,18 @@ export const accountingService = {
 
   getDepartments: async (): Promise<string[]> => {
     const db = await getDb();
-    if (!db) return [];
+    if (!db) return DEPARTMENTS_LIST;
     try {
       const rows = await db.getAllAsync<{ departemen: string }>(
-        'SELECT DISTINCT departemen FROM ref_accounting WHERE departemen IS NOT NULL AND departemen != "" ORDER BY departemen ASC'
+        'SELECT DISTINCT departemen FROM ref_accounting WHERE departemen IS NOT NULL AND departemen != "" AND departemen != "Unlisted" ORDER BY departemen ASC'
       );
-      return rows.map(r => r.departemen);
+      const fromDb = rows.map(r => r.departemen);
+      
+      // Gabungkan list manual + yang ada di DB, hapus duplikat
+      const combined = Array.from(new Set([...DEPARTMENTS_LIST, ...fromDb])).sort();
+      return [...combined, 'Unlisted'];
     } catch (err) {
-      return [];
+      return DEPARTMENTS_LIST;
     }
   }
 };

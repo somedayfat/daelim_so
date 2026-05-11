@@ -45,6 +45,7 @@ export const hasilSoService = {
           tahun_beli = ?, 
           departemen = ?, 
           no_invoice = ?, 
+          no_po = ?, 
           qty_accounting = ?,
           qty_aktual = ?,
           selisih = ?,
@@ -68,6 +69,7 @@ export const hasilSoService = {
           data.tahun_beli || '',
           data.departemen || '',
           data.no_invoice || '',
+          data.no_po || '',
           data.qty_accounting || 0,
           data.qty_aktual || 0,
           selisih,
@@ -84,10 +86,10 @@ export const hasilSoService = {
       await db.runAsync(
         `INSERT INTO hasil_so (
           no_so, ref_accounting_id, nama_lapangan, nama_accounting, spesifikasi, pembuat, 
-          daya_kw, tahun_buat, tahun_beli, departemen, no_invoice, 
+          daya_kw, tahun_buat, tahun_beli, departemen, no_invoice, no_po, 
           qty_accounting, qty_aktual, selisih, status_pengadaan, kondisi, 
           foto_paths, catatan, status_match, status_so, so_session, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
         [
           data.no_so,
           data.ref_accounting_id || null,
@@ -100,6 +102,7 @@ export const hasilSoService = {
           data.tahun_beli || '',
           data.departemen || '',
           data.no_invoice || '',
+          data.no_po || '',
           data.qty_accounting || 0,
           data.qty_aktual || 0,
           selisih,
@@ -149,9 +152,15 @@ export const hasilSoService = {
     const params: any[] = [];
 
     if (dept !== 'Semua') {
-      refBase += ' WHERE departemen = ?';
-      hasilBase += ' WHERE departemen = ?';
-      params.push(dept);
+      if (dept === 'Unlisted') {
+        const unlistedSql = ' WHERE (departemen IS NULL OR departemen = "" OR departemen = "Unlisted")';
+        refBase += unlistedSql;
+        hasilBase += unlistedSql;
+      } else {
+        refBase += ' WHERE departemen = ?';
+        hasilBase += ' WHERE departemen = ?';
+        params.push(dept);
+      }
     }
 
     // Total Tipe Item (Baris)

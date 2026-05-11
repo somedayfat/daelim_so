@@ -30,8 +30,9 @@ const importAccountingDataDirect = async (data: RefAccounting[]) => {
       await db.runAsync(
         `INSERT INTO ref_accounting (
           no_invoice, nama_accounting, spesifikasi, pembuat, 
-          daya_kw, tahun_buat, tahun_beli, departemen, catatan_acc, qty_accounting
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          daya_kw, tahun_buat, tahun_beli, departemen, catatan_acc, qty_accounting,
+          no_po, acquisition_cost
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           item.no_invoice || '',
           item.nama_accounting,
@@ -42,7 +43,9 @@ const importAccountingDataDirect = async (data: RefAccounting[]) => {
           item.tahun_beli || '',
           item.departemen || '',
           item.catatan_acc || '',
-          item.qty_accounting || 1
+          item.qty_accounting || 1,
+          item.no_po || '',
+          item.acquisition_cost || 0
         ]
       );
     }
@@ -70,6 +73,7 @@ export const initDatabase = async () => {
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
       no_invoice      TEXT,
       nama_accounting TEXT NOT NULL,
+      nama_maintenance TEXT,
       spesifikasi     TEXT,
       pembuat         TEXT,
       daya_kw         TEXT,
@@ -78,7 +82,9 @@ export const initDatabase = async () => {
       departemen      TEXT,
       catatan_acc     TEXT,
       qty_accounting  INTEGER DEFAULT 1,
-      is_verified     INTEGER DEFAULT 0
+      no_po           TEXT,
+      is_verified     INTEGER DEFAULT 0,
+      acquisition_cost REAL DEFAULT 0
     );
   `);
 
@@ -97,6 +103,8 @@ export const initDatabase = async () => {
       tahun_beli            TEXT,
       departemen            TEXT,
       no_invoice            TEXT,
+      no_po                 TEXT,
+      acquisition_cost      REAL DEFAULT 0,
       qty_accounting        INTEGER DEFAULT 1,
       qty_aktual            INTEGER DEFAULT 0,
       selisih               INTEGER DEFAULT 0,
@@ -138,8 +146,29 @@ export const initDatabase = async () => {
     } catch (e) { }
 
     try {
+      await db.execAsync("ALTER TABLE ref_accounting ADD COLUMN nama_maintenance TEXT;");
+      console.log("[DB] Migration: Added nama_maintenance column to ref_accounting");
+    } catch (e) { }
+
+    try {
+      await db.execAsync("ALTER TABLE ref_accounting ADD COLUMN no_po TEXT;");
+      console.log("[DB] Migration: Added no_po column to ref_accounting");
+    } catch (e) { }
+
+    try {
+      await db.execAsync("ALTER TABLE hasil_so ADD COLUMN no_po TEXT;");
+      console.log("[DB] Migration: Added no_po column to hasil_so");
+    } catch (e) { }
+
+    try {
       await db.execAsync("ALTER TABLE hasil_so ADD COLUMN kondisi TEXT;");
       console.log("[DB] Migration: Added kondisi column");
+    } catch (e) { }
+
+    try {
+      await db.execAsync("ALTER TABLE ref_accounting ADD COLUMN acquisition_cost REAL DEFAULT 0;");
+      await db.execAsync("ALTER TABLE hasil_so ADD COLUMN acquisition_cost REAL DEFAULT 0;");
+      console.log("[DB] Migration: Added acquisition_cost column");
     } catch (e) { }
   }
 

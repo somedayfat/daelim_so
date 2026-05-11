@@ -6,6 +6,7 @@ export interface RefAccounting {
   id?: number;
   no_invoice?: string;
   nama_accounting: string;
+  nama_maintenance?: string;
   spesifikasi?: string;
   pembuat?: string;
   daya_kw?: string;
@@ -15,6 +16,7 @@ export interface RefAccounting {
   catatan_acc?: string;
   qty_accounting?: number;   // V2: total qty per tipe model dari accounting
   qty_aktual?: number;       // V2: total qty yang sudah ditemukan di lapangan
+  no_po?: string;            // PO Number dari accounting
   is_verified?: number;      // 0 or 1
 }
 
@@ -35,6 +37,7 @@ export interface HasilSO {
   tahun_beli?: string;
   departemen?: string;
   no_invoice?: string;
+  no_po?: string;
 
   // V2: QTY-based
   qty_accounting: number;      // target dari master accounting
@@ -107,3 +110,21 @@ export interface SODashboardStats {
   totalQtyAktual: number;
   selisihTotal: number;
 }
+
+export const DEPARTMENTS_LIST = [
+  'Blanking', 'Shearing', 'Cutting Blanking', 'Surf Buffing', 'Rolling',
+  'Coining', 'Marking', 'Tp.Shaping', 'Heating', 'Tp.Forming',
+  'Prong Grinding', 'Surf Grinding', 'Surface Grd', 'Semi Auto',
+  'Neck Area', 'Cutting', 'Semi Auto Grd', 'Hammer Line 1',
+  'Hammer Line 2', 'Hammer Line 3', 'Hammer Line 4', 'Hammer Line 5',
+  'Blade Grinding', 'Surface Blade', 'Ball Cut', 'Manual Kn',
+  'Bolster', 'Handle Pol', 'Side Pol', 'Hollow Manual',
+  'Perbaikan Kn', 'Hollow Welding', 'Rotary Line', 'Auto Pol Line 1',
+  'Auto Pol Line 2', 'Auto Pol Line 3', 'Auto Pol Line 4', 'Bk Line',
+  'Side Polishing', 'Handle Pol Line 1', 'Handle Pol Line 2',
+  'Handle Pol Line 3', 'Handle Pol Line 4', 'Manual Pol', 'Dry Room',
+  'Buff Sf', 'Packing', 'Moulding', 'Maintenance', 'Drop Hammer',
+  'Pvd', 'Knife', 'S/F'
+];
+
+export const UNLISTED_DEPT = 'Unlisted';

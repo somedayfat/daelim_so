@@ -51,6 +51,15 @@ Dokumen ini berisi tahapan pengerjaan aplikasi SO Asset berbasis React Native (E
 - [x] UI Polishing & Empty State Illustrations.
 - [x] Project Ready for APK Generation.
 
+### 🟦 Phase 7: Maintenance & V2.1 Final Enhancements
+*Goal: Optimasi alur kerja lapangan (Quantity-based & Simplifikasi).*
+- [x] **Dual-Naming Support**: Integrasi Nama Maintenance vs Nama Accounting.
+- [x] **Quantity-based Logic**: SO berbasis jumlah unit (bukan satu-satu).
+- [x] **Simplified Flow**: Penghapusan field Invoice & Buying Date untuk kecepatan input.
+- [x] **Master Data Sugestion**: Penambahan 50+ list departemen sebagai saran otomatis.
+- [x] **Universal Excel Header**: Support format minimalis (Fixed Asset, Type, Maker, Unit, Nama Maint).
+- [x] **Build & Deployment**: Migrasi EAS Account & Sukses Build APK V2.1-Final.
+
 ---
 
 ## 🛠️ Current Progress
@@ -60,6 +69,7 @@ Dokumen ini berisi tahapan pengerjaan aplikasi SO Asset berbasis React Native (E
 - [x] Phase 4
 - [x] Phase 5
 - [x] Phase 6
+- [x] Phase 7
 
 ---
 
