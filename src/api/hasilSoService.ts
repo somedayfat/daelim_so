@@ -49,6 +49,7 @@ export const hasilSoService = {
           qty_aktual = ?,
           selisih = ?,
           status_pengadaan = ?, 
+          kondisi = ?, 
           foto_paths = ?, 
           catatan = ?, 
           status_match = ?, 
@@ -71,6 +72,7 @@ export const hasilSoService = {
           data.qty_aktual || 0,
           selisih,
           data.status_pengadaan || 'Beli',
+          data.kondisi || 'Lama',
           fotoPathsJson,
           data.catatan || '',
           statusMatch,
@@ -83,9 +85,9 @@ export const hasilSoService = {
         `INSERT INTO hasil_so (
           no_so, ref_accounting_id, nama_lapangan, nama_accounting, spesifikasi, pembuat, 
           daya_kw, tahun_buat, tahun_beli, departemen, no_invoice, 
-          qty_accounting, qty_aktual, selisih, status_pengadaan, 
+          qty_accounting, qty_aktual, selisih, status_pengadaan, kondisi, 
           foto_paths, catatan, status_match, status_so, so_session, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
         [
           data.no_so,
           data.ref_accounting_id || null,
@@ -102,6 +104,7 @@ export const hasilSoService = {
           data.qty_aktual || 0,
           selisih,
           data.status_pengadaan || 'Beli',
+          data.kondisi || 'Lama',
           fotoPathsJson,
           data.catatan || '',
           statusMatch,
@@ -137,24 +140,34 @@ export const hasilSoService = {
     return await db.getAllAsync<HasilSO>(sql, params);
   },
 
-  getSummaryStats: async (): Promise<SODashboardStats> => {
+  getSummaryStats: async (dept: string = 'Semua'): Promise<SODashboardStats> => {
     const db = await getDb();
     if (!db) return { totalAccounting: 0, sudahSO: 0, belumSO: 0, assetBaru: 0, progress: 0, totalQtyAccounting: 0, totalQtyAktual: 0, selisihTotal: 0 };
 
+    let refBase = 'FROM ref_accounting';
+    let hasilBase = 'FROM hasil_so';
+    const params: any[] = [];
+
+    if (dept !== 'Semua') {
+      refBase += ' WHERE departemen = ?';
+      hasilBase += ' WHERE departemen = ?';
+      params.push(dept);
+    }
+
     // Total Tipe Item (Baris)
-    const totalTipeRes = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM ref_accounting');
+    const totalTipeRes = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) as count ${refBase}`, params);
     const totalTipe = totalTipeRes?.count || 0;
 
     // Tipe yang sudah di-SO
-    const sudahSoRes = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM hasil_so');
+    const sudahSoRes = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) as count ${hasilBase}`, params);
     const sudahSo = sudahSoRes?.count || 0;
 
     // Total UNIT (SUM Qty) dari MASTER
-    const qtyAccRes = await db.getFirstAsync<{ total: number }>('SELECT SUM(qty_accounting) as total FROM ref_accounting');
+    const qtyAccRes = await db.getFirstAsync<{ total: number }>(`SELECT SUM(qty_accounting) as total ${refBase}`, params);
     const totalQtyAcc = qtyAccRes?.total || 0;
 
     // Total UNIT (SUM Qty) dari HASIL LAPANGAN
-    const qtyAktRes = await db.getFirstAsync<{ total: number }>('SELECT SUM(qty_aktual) as total FROM hasil_so');
+    const qtyAktRes = await db.getFirstAsync<{ total: number }>(`SELECT SUM(qty_aktual) as total ${hasilBase}`, params);
     const totalQtyAkt = qtyAktRes?.total || 0;
 
     return {
@@ -216,5 +229,21 @@ export const hasilSoService = {
         await db.runAsync('UPDATE ref_accounting SET is_verified = 0 WHERE id = ?', [row.ref_accounting_id]);
       }
     }
+  },
+
+  getPreviousQty: async (refId: number, excludeId?: number): Promise<number> => {
+    const db = await getDb();
+    if (!db || !refId) return 0;
+    
+    let sql = 'SELECT SUM(qty_aktual) as total FROM hasil_so WHERE ref_accounting_id = ?';
+    const params: any[] = [refId];
+
+    if (excludeId) {
+      sql += ' AND id != ?';
+      params.push(excludeId);
+    }
+
+    const res = await db.getFirstAsync<{ total: number }>(sql, params);
+    return res?.total || 0;
   }
 };

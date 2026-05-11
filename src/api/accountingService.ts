@@ -115,5 +115,46 @@ export const accountingService = {
     const db = await getDb();
     if (!db) return [];
     return await db.getAllAsync<RefAccounting>('SELECT * FROM ref_accounting WHERE is_verified = 0 ORDER BY nama_accounting ASC');
+  },
+
+  getSOStatusList: async (dept: string = 'Semua'): Promise<RefAccounting[]> => {
+    const db = await getDb();
+    if (!db) return [];
+    try {
+      let sql = `
+        SELECT 
+          r.*,
+          (SELECT SUM(qty_aktual) FROM hasil_so h WHERE h.ref_accounting_id = r.id) as qty_aktual
+        FROM ref_accounting r
+      `;
+      const params: any[] = [];
+      if (dept !== 'Semua') {
+        sql += ' WHERE r.departemen = ?';
+        params.push(dept);
+      }
+      sql += ' ORDER BY r.nama_accounting ASC';
+
+      const rows = await db.getAllAsync<any>(sql, params);
+      return rows.map(r => ({
+        ...r,
+        qty_aktual: r.qty_aktual || 0
+      }));
+    } catch (err: any) {
+      console.error('[accountingService.getSOStatusList] error:', err);
+      return [];
+    }
+  },
+
+  getDepartments: async (): Promise<string[]> => {
+    const db = await getDb();
+    if (!db) return [];
+    try {
+      const rows = await db.getAllAsync<{ departemen: string }>(
+        'SELECT DISTINCT departemen FROM ref_accounting WHERE departemen IS NOT NULL AND departemen != "" ORDER BY departemen ASC'
+      );
+      return rows.map(r => r.departemen);
+    } catch (err) {
+      return [];
+    }
   }
 };

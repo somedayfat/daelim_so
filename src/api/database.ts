@@ -101,6 +101,7 @@ export const initDatabase = async () => {
       qty_aktual            INTEGER DEFAULT 0,
       selisih               INTEGER DEFAULT 0,
       status_pengadaan      TEXT,
+      kondisi               TEXT,
       foto_paths            TEXT DEFAULT '[]', -- JSON Array
       catatan               TEXT,
       status_match          TEXT,
@@ -134,9 +135,12 @@ export const initDatabase = async () => {
     try {
       await db.execAsync("ALTER TABLE hasil_so ADD COLUMN no_so TEXT;");
       console.log("[DB] Migration: Added no_so column to existing table");
-    } catch (e) {
-      // Column might already exist, ignore
-    }
+    } catch (e) { }
+
+    try {
+      await db.execAsync("ALTER TABLE hasil_so ADD COLUMN kondisi TEXT;");
+      console.log("[DB] Migration: Added kondisi column");
+    } catch (e) { }
   }
 
   // Tabel config

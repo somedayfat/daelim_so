@@ -14,6 +14,7 @@ export interface RefAccounting {
   departemen?: string;
   catatan_acc?: string;
   qty_accounting?: number;   // V2: total qty per tipe model dari accounting
+  qty_aktual?: number;       // V2: total qty yang sudah ditemukan di lapangan
   is_verified?: number;      // 0 or 1
 }
 
@@ -48,6 +49,7 @@ export interface HasilSO {
   // BARU: tidak ada di master accounting
   status_match: 'MATCH' | 'KURANG' | 'LEBIH' | 'TIDAK_ADA' | 'BARU';
   status_pengadaan?: 'Beli' | 'Buat Sendiri';
+  kondisi?: 'Lama' | 'Baru';
   status_so: 'DRAFT' | 'FINAL';
 
   // V2: Multiple foto (JSON array string, e.g. '["path1.jpg","path2.jpg"]')

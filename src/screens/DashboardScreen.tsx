@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, StyleSheet, ScrollView, Alert, Image } from 'react-native';
-import { Text, Card, Button, ProgressBar, Title, IconButton, ActivityIndicator } from 'react-native-paper';
+import { Text, Card, Button, ProgressBar, Title, IconButton, ActivityIndicator, DataTable, Searchbar, Divider, Chip } from 'react-native-paper';
 import { useAppStore } from '../store/useAppStore';
 import { useFocusEffect } from '@react-navigation/native';
 import { hasilSoService } from '../api/hasilSoService';
@@ -12,18 +12,28 @@ const DashboardScreen = ({ navigation }: any) => {
   const { soSession, stats, setStats } = useAppStore();
   const [refreshing, setRefreshing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [statusList, setStatusList] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState<number>(0);
+  const itemsPerPage = 5;
+  const [selectedDept, setSelectedDept] = useState('Semua');
+  const [departments, setDepartments] = useState<string[]>([]);
 
   const loadStats = useCallback(async () => {
     setRefreshing(true);
     try {
-      const data = await hasilSoService.getSummaryStats();
+      const data = await hasilSoService.getSummaryStats(selectedDept);
       setStats(data);
+      const list = await accountingService.getSOStatusList(selectedDept);
+      setStatusList(list);
+      const depts = await accountingService.getDepartments();
+      setDepartments(['Semua', ...depts]);
     } catch (error) {
       console.error(error);
     } finally {
       setRefreshing(false);
     }
-  }, [setStats]);
+  }, [setStats, selectedDept]);
 
   useFocusEffect(
     useCallback(() => {
@@ -94,6 +104,27 @@ const DashboardScreen = ({ navigation }: any) => {
         <IconButton icon="refresh" onPress={loadStats} disabled={refreshing} />
       </View>
 
+      {/* FILTER DEPARTEMEN */}
+      <View style={{ marginBottom: 15 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 5 }}>
+          {departments.map((dept, idx) => (
+            <Chip
+              key={idx}
+              selected={selectedDept === dept}
+              onPress={() => {
+                setSelectedDept(dept);
+                setPage(0);
+              }}
+              showSelectedCheck={false}
+              style={{ backgroundColor: selectedDept === dept ? '#1565C0' : '#e0e0e0' }}
+              textStyle={{ color: selectedDept === dept ? '#fff' : '#444', fontSize: 12 }}
+            >
+              {dept}
+            </Chip>
+          ))}
+        </ScrollView>
+      </View>
+
       <Card style={styles.card}>
         <Card.Content>
           <Text variant="titleMedium">Progress Stock Opname</Text>
@@ -137,6 +168,97 @@ const DashboardScreen = ({ navigation }: any) => {
           </Card.Content>
         </Card>
       </View>
+
+      {/* TABEL STATUS TIPE ITEM */}
+      <Card style={[styles.card, { marginBottom: 20 }]}>
+        <Card.Content>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <Text variant="titleMedium" style={{ color: '#1565C0' }}>Status per Tipe Item</Text>
+            {refreshing && <ActivityIndicator size="small" color="#1565C0" />}
+          </View>
+          <Searchbar
+            placeholder="Cari tipe mesin..."
+            onChangeText={setSearchQuery}
+            value={searchQuery}
+            style={styles.searchbar}
+            inputStyle={{ minHeight: 0 }}
+          />
+          
+          <DataTable>
+            <DataTable.Header>
+              <DataTable.Title style={{ flex: 3 }}>Nama / Spesifikasi</DataTable.Title>
+              <DataTable.Title numeric style={{ flex: 1 }}>Aktual</DataTable.Title>
+              <DataTable.Title numeric style={{ flex: 1 }}>Target</DataTable.Title>
+            </DataTable.Header>
+
+            {statusList
+              .filter(item => 
+                String(item.nama_accounting).toLowerCase().includes(searchQuery.toLowerCase()) ||
+                String(item.spesifikasi).toLowerCase().includes(searchQuery.toLowerCase())
+              )
+              .slice(page * itemsPerPage, (page + 1) * itemsPerPage)
+              .map((item, idx) => {
+                const isMatch = item.qty_aktual === item.qty_accounting;
+                const isZero = item.qty_aktual === 0;
+                
+                return (
+                  <DataTable.Row key={idx}>
+                    <DataTable.Cell style={{ flex: 3 }}>
+                      <View>
+                        <Text variant="bodySmall" numberOfLines={1} style={{ fontWeight: 'bold' }}>{item.nama_accounting}</Text>
+                        <Text variant="labelSmall" numberOfLines={1} style={{ color: '#757575' }}>{item.spesifikasi}</Text>
+                      </View>
+                    </DataTable.Cell>
+                    <DataTable.Cell numeric style={{ flex: 1 }}>
+                      <Text style={{ 
+                        color: isMatch ? '#2e7d32' : (isZero ? '#d32f2f' : '#1565C0'),
+                        fontWeight: 'bold' 
+                      }}>
+                        {item.qty_aktual}
+                      </Text>
+                    </DataTable.Cell>
+                    <DataTable.Cell numeric style={{ flex: 1 }}>{item.qty_accounting}</DataTable.Cell>
+                  </DataTable.Row>
+                );
+              })}
+
+            <DataTable.Pagination
+              page={page}
+              numberOfPages={Math.ceil(
+                statusList.filter(item => 
+                  String(item.nama_accounting).toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  String(item.spesifikasi).toLowerCase().includes(searchQuery.toLowerCase())
+                ).length / itemsPerPage
+              )}
+              onPageChange={(page) => setPage(page)}
+              label={`${page + 1} of ${Math.ceil(
+                statusList.filter(item => 
+                  String(item.nama_accounting).toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  String(item.spesifikasi).toLowerCase().includes(searchQuery.toLowerCase())
+                ).length / itemsPerPage
+              )}`}
+              showFastPaginationControls
+              numberOfItemsPerPage={itemsPerPage}
+            />
+            
+            <Divider />
+            <Button 
+              onPress={() => navigation.navigate('SOList')} 
+              mode="text" 
+              compact 
+              style={{ marginTop: 5 }}
+            >
+              Lanjut Input SO ({statusList.length} Tipe)
+            </Button>
+
+            {statusList.length === 0 && (
+              <Text style={{ textAlign: 'center', marginVertical: 20, color: '#757575' }}>
+                Belum ada data tipe mesin.
+              </Text>
+            )}
+          </DataTable>
+        </Card.Content>
+      </Card>
 
       <View style={styles.buttonGrid}>
         <Button
@@ -261,6 +383,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 16,
     paddingHorizontal: 8,
+    marginBottom: 40,
+  },
+  searchbar: {
+    elevation: 0,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    height: 40,
+    marginBottom: 10,
   },
 });
 

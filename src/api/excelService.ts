@@ -97,8 +97,12 @@ export const exportToExcel = async (
       'Status':           String(item.status_match || ''),
       'Departemen':       String(item.departemen || ''),
       'Merk/Pembuat':     String(item.pembuat || ''),
+      'Daya (KW)':        String(item.daya_kw || ''),
+      'Thn Buat':         String(item.tahun_buat || ''),
+      'Thn Beli':         String(item.tahun_beli || ''),
       'No Invoice':       String(item.no_invoice || ''),
-      'Tahun Beli':       String(item.tahun_beli || ''),
+      'Pengadaan':        String(item.status_pengadaan || ''),
+      'Kondisi':          String(item.kondisi || ''),
       'Status SO':        String(item.status_so || ''),
       'Catatan':          String(item.catatan || ''),
       'Jumlah Foto':      listFoto.length,
@@ -108,9 +112,10 @@ export const exportToExcel = async (
 
   const wsHasil = XLSX.utils.json_to_sheet(hasilFormatted);
   wsHasil['!cols'] = [
-    {wch:25},{wch:25},{wch:18},{wch:15},{wch:12},
-    {wch:10},{wch:15},{wch:15},{wch:15},{wch:18},
-    {wch:12},{wch:12},{wch:25},{wch:12},{wch:25},
+    {wch:15},{wch:25},{wch:25},{wch:20},{wch:12},
+    {wch:12},{wch:12},{wch:15},{wch:15},{wch:18},
+    {wch:12},{wch:12},{wch:12},{wch:18},{wch:15},
+    {wch:12},{wch:12},{wch:20},{wch:12},{wch:25},
   ];
   XLSX.utils.book_append_sheet(wb, wsHasil, 'Hasil SO');
 

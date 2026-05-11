@@ -40,6 +40,7 @@ const SOFormScreen = ({ route, navigation }: any) => {
   const [suggestions, setSuggestions] = useState<RefAccounting[]>([]);
   const [accData, setAccData] = useState<RefAccounting[]>([]);
   const [linkedAccounting, setLinkedAccounting] = useState<RefAccounting | null>(null);
+  const [prevQty, setPrevQty] = useState(0);
 
   // V2 State
   const [fotoList, setFotoList] = useState<string[]>([]);
@@ -56,6 +57,7 @@ const SOFormScreen = ({ route, navigation }: any) => {
     qty_accounting: 0,
     qty_aktual: 0,
     status_pengadaan: 'Beli',
+    kondisi: 'Lama',
     catatan: '',
     status_match: 'MATCH',
     status_so: 'DRAFT',
@@ -74,6 +76,7 @@ const SOFormScreen = ({ route, navigation }: any) => {
           qty_accounting: editItem.qty_accounting,
           departemen: editItem.departemen,
         } as RefAccounting);
+        loadPrevQty(editItem.ref_accounting_id, editItem.id);
       }
     } else if (accItem) {
       handleSelectAccounting(accItem);
@@ -82,6 +85,11 @@ const SOFormScreen = ({ route, navigation }: any) => {
       initNewForm();
     }
   }, [editItem, accItem]);
+
+  const loadPrevQty = async (refId: number, currentId?: number) => {
+    const qty = await hasilSoService.getPreviousQty(refId, currentId);
+    setPrevQty(qty);
+  };
 
   const initNewForm = async () => {
     const nextNo = await generateNextSoNumber();
@@ -170,6 +178,7 @@ const SOFormScreen = ({ route, navigation }: any) => {
         status_match: newStatus,
       };
     });
+    if (acc.id) loadPrevQty(acc.id);
     setSuggestions([]);
     setModalVisible(false);
   };
@@ -183,6 +192,7 @@ const SOFormScreen = ({ route, navigation }: any) => {
       qty_accounting: 0,
       status_match: 'MATCH',
     }));
+    setPrevQty(0);
   };
 
   const updateField = (field: keyof HasilSO) => (value: any) => {
@@ -231,8 +241,16 @@ const SOFormScreen = ({ route, navigation }: any) => {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 80}
+    >
+      <ScrollView 
+        style={styles.container} 
+        contentContainerStyle={{ paddingBottom: 50 }}
+        keyboardShouldPersistTaps="handled"
+      >
         
         {/* MULTIPLE PHOTOS */}
         <Card style={styles.card}>
@@ -270,6 +288,11 @@ const SOFormScreen = ({ route, navigation }: any) => {
               <View style={styles.qtyBox}>
                 <Text variant="labelSmall">Target (Accounting)</Text>
                 <Text variant="titleLarge" style={styles.qtyTarget}>{form.qty_accounting || 0}</Text>
+                {linkedAccounting && (
+                  <Text variant="labelSmall" style={{ color: '#1565C0', marginTop: 4 }}>
+                    Input sblmnya: {prevQty}
+                  </Text>
+                )}
               </View>
               <View style={styles.qtyDivider} />
               <View style={styles.qtyBox}>
@@ -284,6 +307,11 @@ const SOFormScreen = ({ route, navigation }: any) => {
                 />
               </View>
             </View>
+            {linkedAccounting && (
+              <Text variant="bodySmall" style={{ textAlign: 'center', color: '#666', marginTop: 5 }}>
+                Total: {prevQty + Number(form.qty_aktual || 0)} / {form.qty_accounting}
+              </Text>
+            )}
             <View style={[styles.statusBadge, { backgroundColor: getStatusMatchColor(form.status_match || 'MATCH') }]}>
               <Text style={styles.statusText}>STATUS: {form.status_match}</Text>
             </View>
@@ -295,16 +323,31 @@ const SOFormScreen = ({ route, navigation }: any) => {
           <Card.Content>
             <Text variant="titleMedium" style={styles.sectionTitle}>DETAIL ITEM</Text>
             
-            <View style={{ marginBottom: 15 }}>
-              <Text variant="labelSmall" style={{ marginBottom: 8, color: '#757575' }}>STATUS PENGADAAN</Text>
-              <SegmentedButtons
-                value={form.status_pengadaan || 'Beli'}
-                onValueChange={val => setForm(prev => ({ ...prev, status_pengadaan: val as any }))}
-                buttons={[
-                  { value: 'Beli', label: 'Beli', icon: 'cart-outline' },
-                  { value: 'Buat Sendiri', label: 'Buat Sendiri', icon: 'hammer-wrench' },
-                ]}
-              />
+            <View style={styles.row}>
+              <View style={[styles.half, { marginBottom: 15 }]}>
+                <Text variant="labelSmall" style={{ marginBottom: 8, color: '#757575' }}>STATUS PENGADAAN</Text>
+                <SegmentedButtons
+                  value={form.status_pengadaan || 'Beli'}
+                  onValueChange={val => setForm(prev => ({ ...prev, status_pengadaan: val as any }))}
+                  buttons={[
+                    { value: 'Beli', label: 'Beli', icon: 'cart-outline' },
+                    { value: 'Buat Sendiri', label: 'Buat', icon: 'hammer-wrench' },
+                  ]}
+                  density="medium"
+                />
+              </View>
+              <View style={[styles.half, { marginBottom: 15 }]}>
+                <Text variant="labelSmall" style={{ marginBottom: 8, color: '#757575' }}>KONDISI</Text>
+                <SegmentedButtons
+                  value={form.kondisi || 'Lama'}
+                  onValueChange={val => setForm(prev => ({ ...prev, kondisi: val as any }))}
+                  buttons={[
+                    { value: 'Lama', label: 'Lama', icon: 'history' },
+                    { value: 'Baru', label: 'Baru', icon: 'sparkles' },
+                  ]}
+                  density="medium"
+                />
+              </View>
             </View>
 
             <TextInput
@@ -341,6 +384,40 @@ const SOFormScreen = ({ route, navigation }: any) => {
                 label="Merk"
                 value={form.pembuat}
                 onChangeText={updateField('pembuat')}
+                mode="outlined"
+                style={[styles.input, styles.half]}
+              />
+              <TextInput
+                label="Daya (KW)"
+                value={form.daya_kw}
+                onChangeText={updateField('daya_kw')}
+                mode="outlined"
+                style={[styles.input, styles.half]}
+              />
+            </View>
+
+            <View style={styles.row}>
+              <TextInput
+                label="Thn Buat"
+                value={form.tahun_buat}
+                onChangeText={updateField('tahun_buat')}
+                mode="outlined"
+                style={[styles.input, styles.half]}
+              />
+              <TextInput
+                label="Thn Beli"
+                value={form.tahun_beli}
+                onChangeText={updateField('tahun_beli')}
+                mode="outlined"
+                style={[styles.input, styles.half]}
+              />
+            </View>
+
+            <View style={styles.row}>
+              <TextInput
+                label="No Invoice"
+                value={form.no_invoice}
+                onChangeText={updateField('no_invoice')}
                 mode="outlined"
                 style={[styles.input, styles.half]}
               />
