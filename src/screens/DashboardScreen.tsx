@@ -17,6 +17,7 @@ const DashboardScreen = ({ navigation }: any) => {
   const [page, setPage] = useState<number>(0);
   const itemsPerPage = 5;
   const [selectedDept, setSelectedDept] = useState('Semua');
+  const [qtyFilter, setQtyFilter] = useState('Semua');
   const [departments, setDepartments] = useState<string[]>([]);
 
   const loadStats = useCallback(async () => {
@@ -107,7 +108,53 @@ const DashboardScreen = ({ navigation }: any) => {
       {/* FILTER DEPARTEMEN */}
       <View style={{ marginBottom: 15 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 5 }}>
-          {departments.map((dept, idx) => (
+          {/* Filter Status Kuantitas */}
+          <Chip 
+            selected={qtyFilter === 'Semua' && selectedDept === 'Semua'} 
+            onPress={() => {
+              setQtyFilter('Semua');
+              setSelectedDept('Semua');
+              setPage(0);
+            }}
+            showSelectedCheck={false}
+            style={{ backgroundColor: (qtyFilter === 'Semua' && selectedDept === 'Semua') ? '#1565C0' : '#e0e0e0' }}
+            textStyle={{ color: (qtyFilter === 'Semua' && selectedDept === 'Semua') ? '#fff' : '#444', fontSize: 12 }}
+          >
+            Semua
+          </Chip>
+          
+          <Chip 
+            selected={qtyFilter === 'Kurang'} 
+            onPress={() => {
+              setQtyFilter('Kurang');
+              setPage(0);
+            }}
+            showSelectedCheck={false}
+            icon="alert-circle-outline"
+            style={{ backgroundColor: qtyFilter === 'Kurang' ? '#d32f2f' : '#feebee' }}
+            textStyle={{ color: qtyFilter === 'Kurang' ? '#fff' : '#d32f2f', fontSize: 12 }}
+          >
+            Kurang
+          </Chip>
+
+          <Chip 
+            selected={qtyFilter === 'Lebih'} 
+            onPress={() => {
+              setQtyFilter('Lebih');
+              setPage(0);
+            }}
+            showSelectedCheck={false}
+            icon="plus-circle-outline"
+            style={{ backgroundColor: qtyFilter === 'Lebih' ? '#2e7d32' : '#e8f5e9' }}
+            textStyle={{ color: qtyFilter === 'Lebih' ? '#fff' : '#2e7d32', fontSize: 12 }}
+          >
+            Lebih
+          </Chip>
+
+          <View style={{ width: 1, height: 24, backgroundColor: '#ddd', marginHorizontal: 4, alignSelf: 'center' }} />
+
+          {/* Filter Departemen */}
+          {departments.filter(d => d !== 'Semua').map((dept, idx) => (
             <Chip
               key={idx}
               selected={selectedDept === dept}
@@ -192,10 +239,21 @@ const DashboardScreen = ({ navigation }: any) => {
             </DataTable.Header>
 
             {statusList
-              .filter(item =>
-                String(item.nama_accounting).toLowerCase().includes(searchQuery.toLowerCase()) ||
-                String(item.spesifikasi).toLowerCase().includes(searchQuery.toLowerCase())
-              )
+              .filter(item => {
+                const matchesSearch = 
+                  String(item.nama_accounting).toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  String(item.spesifikasi).toLowerCase().includes(searchQuery.toLowerCase());
+                
+                if (!matchesSearch) return false;
+
+                if (qtyFilter === 'Kurang') {
+                  return item.qty_aktual < item.qty_accounting;
+                }
+                if (qtyFilter === 'Lebih') {
+                  return item.qty_aktual > item.qty_accounting;
+                }
+                return true;
+              })
               .slice(page * itemsPerPage, (page + 1) * itemsPerPage)
               .map((item, idx) => {
                 const isMatch = item.qty_aktual === item.qty_accounting;
@@ -225,17 +283,39 @@ const DashboardScreen = ({ navigation }: any) => {
             <DataTable.Pagination
               page={page}
               numberOfPages={Math.ceil(
-                statusList.filter(item =>
-                  String(item.nama_accounting).toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  String(item.spesifikasi).toLowerCase().includes(searchQuery.toLowerCase())
-                ).length / itemsPerPage
+                statusList.filter(item => {
+                  const matchesSearch = 
+                    String(item.nama_accounting).toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    String(item.spesifikasi).toLowerCase().includes(searchQuery.toLowerCase());
+                  
+                  if (!matchesSearch) return false;
+
+                  if (qtyFilter === 'Kurang') {
+                    return item.qty_aktual < item.qty_accounting;
+                  }
+                  if (qtyFilter === 'Lebih') {
+                    return item.qty_aktual > item.qty_accounting;
+                  }
+                  return true;
+                }).length / itemsPerPage
               )}
               onPageChange={(page) => setPage(page)}
               label={`${page + 1} of ${Math.ceil(
-                statusList.filter(item =>
-                  String(item.nama_accounting).toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  String(item.spesifikasi).toLowerCase().includes(searchQuery.toLowerCase())
-                ).length / itemsPerPage
+                statusList.filter(item => {
+                  const matchesSearch = 
+                    String(item.nama_accounting).toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    String(item.spesifikasi).toLowerCase().includes(searchQuery.toLowerCase());
+                  
+                  if (!matchesSearch) return false;
+
+                  if (qtyFilter === 'Kurang') {
+                    return item.qty_aktual < item.qty_accounting;
+                  }
+                  if (qtyFilter === 'Lebih') {
+                    return item.qty_aktual > item.qty_accounting;
+                  }
+                  return true;
+                }).length / itemsPerPage
               )}`}
               showFastPaginationControls
               numberOfItemsPerPage={itemsPerPage}

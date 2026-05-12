@@ -31,8 +31,8 @@ const importAccountingDataDirect = async (data: RefAccounting[]) => {
         `INSERT INTO ref_accounting (
           no_invoice, nama_accounting, spesifikasi, pembuat, 
           daya_kw, tahun_buat, tahun_beli, departemen, catatan_acc, qty_accounting,
-          no_po, acquisition_cost
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          no_po
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           item.no_invoice || '',
           item.nama_accounting,
@@ -44,8 +44,7 @@ const importAccountingDataDirect = async (data: RefAccounting[]) => {
           item.departemen || '',
           item.catatan_acc || '',
           item.qty_accounting || 1,
-          item.no_po || '',
-          item.acquisition_cost || 0
+          item.no_po || ''
         ]
       );
     }
@@ -83,8 +82,7 @@ export const initDatabase = async () => {
       catatan_acc     TEXT,
       qty_accounting  INTEGER DEFAULT 1,
       no_po           TEXT,
-      is_verified     INTEGER DEFAULT 0,
-      acquisition_cost REAL DEFAULT 0
+      is_verified     INTEGER DEFAULT 0
     );
   `);
 
@@ -104,7 +102,6 @@ export const initDatabase = async () => {
       departemen            TEXT,
       no_invoice            TEXT,
       no_po                 TEXT,
-      acquisition_cost      REAL DEFAULT 0,
       qty_accounting        INTEGER DEFAULT 1,
       qty_aktual            INTEGER DEFAULT 0,
       selisih               INTEGER DEFAULT 0,
